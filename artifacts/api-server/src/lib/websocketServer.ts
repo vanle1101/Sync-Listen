@@ -89,6 +89,7 @@ export function setupWebSocketServer(server: http.Server): void {
         case "add_track": {
           const track = msg.track as Track;
           if (!track?.videoId) break;
+          logger.info({ roomId: currentRoomId, trackId: track.videoId, title: track.title }, "Track added");
           room.playlist.push(track);
           if (!room.currentTrack) {
             room.currentTrack = room.playlist[0];
