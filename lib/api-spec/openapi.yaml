@@ -3,13 +3,17 @@ info:
   # Do not change the title, if the title changes, the import paths will be broken
   title: Api
   version: 0.1.0
-  description: API specification
+  description: API specification for Music Together - collaborative listening rooms
 servers:
   - url: /api
     description: Base API path
 tags:
   - name: health
     description: Health operations
+  - name: rooms
+    description: Room management
+  - name: youtube
+    description: YouTube search
 paths:
   /healthz:
     get:
@@ -24,6 +28,72 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+
+  /rooms:
+    post:
+      operationId: createRoom
+      tags: [rooms]
+      summary: Create a new listening room
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateRoomBody"
+      responses:
+        "201":
+          description: Room created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Room"
+
+  /rooms/{roomId}:
+    get:
+      operationId: getRoom
+      tags: [rooms]
+      summary: Get room info
+      parameters:
+        - name: roomId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Room info
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Room"
+        "404":
+          description: Room not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /youtube/search:
+    get:
+      operationId: youtubeSearch
+      tags: [youtube]
+      summary: Search YouTube videos
+      parameters:
+        - name: q
+          in: query
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Search results
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/YoutubeVideo"
+
 components:
   schemas:
     HealthStatus:
@@ -34,3 +104,52 @@ components:
       required:
         - status
 
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: string
+      required:
+        - error
+
+    CreateRoomBody:
+      type: object
+      properties:
+        hostName:
+          type: string
+      required:
+        - hostName
+
+    Room:
+      type: object
+      properties:
+        id:
+          type: string
+        hostName:
+          type: string
+        createdAt:
+          type: string
+      required:
+        - id
+        - hostName
+        - createdAt
+
+    YoutubeVideo:
+      type: object
+      properties:
+        videoId:
+          type: string
+        title:
+          type: string
+        channelTitle:
+          type: string
+        thumbnail:
+          type: string
+        duration:
+          type: ["string", "null"]
+      required:
+        - videoId
+        - title
+        - channelTitle
+        - thumbnail
+        - duration
