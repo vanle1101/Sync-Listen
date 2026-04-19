@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback, useRef } from "react";
 import { useParams, useLocation } from "wouter";
 import { useWebSocket } from "@/hooks/use-websocket";
-import { Track } from "@/lib/types";
+import { Track, ChatMessage } from "@/lib/types";
 import { useToast } from "@/hooks/use-toast";
 import { useUser } from "@clerk/react";
 import { Button } from "@/components/ui/button";
@@ -9,8 +9,9 @@ import { YoutubePlayer } from "@/components/youtube-player";
 import { PlayerControls } from "@/components/player-controls";
 import { RightPanel } from "@/components/right-panel";
 import {
-  Music, Loader2, Copy, LogOut, Minimize2, Share2, CreditCard,
-  Palette, Coffee, Settings, Globe, Users, X, Download, Check, Heart, ImagePlus, Power, Lock, Eye, EyeOff
+  Music, Loader2, Copy, LogOut, Minimize2, Maximize2, Share2, CreditCard,
+  Palette, Coffee, Settings, Globe, Users, X, Download, Check, Heart, ImagePlus, Power, Lock, Eye, EyeOff,
+  MessageCircle, Send, ChevronDown
 } from "lucide-react";
 import { useGetRoom, getGetRoomQueryKey } from "@workspace/api-client-react";
 
@@ -39,6 +40,91 @@ const THEMES = [
   { id: "neon",     emoji: "💜", name: "Neon",      colors: ["#1a0a2e","#b060ff","#ff60d0"], bg: "from-[#1a0a2e] via-[#2a0a40] to-[#1a1a3e]" },
   { id: "arctic",   emoji: "❄️", name: "Arctic",    colors: ["#eef8fc","#40b0e0","#80d0f0"], bg: "from-[#eef8fc] via-[#ddeef8] to-[#e8f4fc]" },
 ];
+
+/* ──────────────── FullscreenChat ──────────────── */
+const IMAGE_URL_RE_FS = /^https?:\/\/\S+\.(jpg|jpeg|png|gif|webp|svg|avif)(\?[^\s]*)?$/i;
+
+function FullscreenChat({
+  messages, currentUser, myAvatarUrl, userAvatars, onSendMessage, onMinimize, onClose,
+}: {
+  messages: ChatMessage[]; currentUser: string; myAvatarUrl?: string;
+  userAvatars?: Record<string, string>; onSendMessage: (t: string) => void;
+  onMinimize: () => void; onClose: () => void;
+}) {
+  const [text, setText] = useState("");
+  const scrollRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+  }, [messages.length]);
+
+  const submit = (e: React.FormEvent) => {
+    e.preventDefault();
+    const t = text.trim(); if (!t) return;
+    onSendMessage(t); setText("");
+  };
+
+  return (
+    <div className="w-[300px] flex flex-col rounded-2xl shadow-2xl overflow-hidden border border-white/20" style={{ background: "rgba(255,255,255,0.92)", backdropFilter: "blur(20px)" }}>
+      {/* Header */}
+      <div className="flex items-center gap-2 px-3 py-2.5 shrink-0 border-b border-black/5" style={{ background: "rgba(192,112,128,0.12)" }}>
+        <MessageCircle className="w-3.5 h-3.5 text-primary shrink-0" />
+        <span className="text-xs font-semibold text-foreground/80 flex-1">Phòng chat</span>
+        <button onClick={onMinimize} title="Thu nhỏ" className="w-6 h-6 rounded-lg flex items-center justify-center text-muted-foreground/50 hover:bg-black/8 hover:text-primary transition-colors">
+          <ChevronDown className="w-3.5 h-3.5" />
+        </button>
+        <button onClick={onClose} title="Đóng" className="w-6 h-6 rounded-lg flex items-center justify-center text-muted-foreground/50 hover:bg-red-50 hover:text-red-500 transition-colors">
+          <X className="w-3.5 h-3.5" />
+        </button>
+      </div>
+
+      {/* Messages */}
+      <div ref={scrollRef} className="overflow-y-auto min-h-0 p-3 space-y-2" style={{ maxHeight: 340 }}>
+        {messages.length === 0 ? (
+          <div className="py-6 text-center text-xs text-muted-foreground/50">Chưa có tin nhắn nào</div>
+        ) : messages.map((msg, i) => {
+          const isMe = msg.userName === currentUser;
+          const avatarUrl = isMe ? myAvatarUrl : userAvatars?.[msg.userName];
+          const showName = i === 0 || messages[i - 1].userName !== msg.userName;
+          const isImg = IMAGE_URL_RE_FS.test(msg.text.trim()) || msg.text.startsWith("data:image/");
+          const isVoice = msg.text.startsWith("[voice]");
+          return (
+            <div key={i} className={`flex ${isMe ? "flex-row-reverse" : "flex-row"} items-end gap-1.5`}>
+              <div className="shrink-0">
+                {showName ? (
+                  <div className="w-6 h-6 rounded-full flex items-center justify-center text-[9px] font-bold text-white shrink-0 overflow-hidden shadow-sm"
+                    style={{ background: avatarUrl ? "transparent" : "linear-gradient(135deg,#c07080,#7a9e7e)" }}>
+                    {avatarUrl ? <img src={avatarUrl} alt="" className="w-full h-full object-cover" /> : msg.userName[0]?.toUpperCase()}
+                  </div>
+                ) : <div className="w-6" />}
+              </div>
+              <div className={`flex flex-col max-w-[75%] ${isMe ? "items-end" : "items-start"}`}>
+                {showName && !isMe && <span className="text-[9px] font-semibold text-foreground/50 mb-0.5 px-1">{msg.userName}</span>}
+                <div className={`rounded-2xl text-xs shadow-sm ${isImg ? "p-1" : "px-3 py-1.5"} ${isMe ? "bg-gradient-to-br from-primary to-[#d4a0ab] text-white rounded-br-sm" : "bg-gray-100 text-foreground rounded-bl-sm"}`}>
+                  {isImg ? (
+                    <img src={msg.text} alt="" className="rounded-xl max-w-[180px] max-h-[180px] object-cover" />
+                  ) : isVoice ? (
+                    <span className="opacity-70 italic">🎤 Tin nhắn thoại</span>
+                  ) : msg.text}
+                </div>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Input */}
+      <form onSubmit={submit} className="flex items-center gap-1.5 p-2 border-t border-black/5 shrink-0">
+        <input value={text} onChange={e => setText(e.target.value)} placeholder="Nhắn gì đó..."
+          className="flex-1 h-8 bg-gray-50 border border-primary/10 rounded-xl px-3 text-xs focus:outline-none focus:border-primary/40" />
+        <button type="submit" disabled={!text.trim()}
+          className="w-8 h-8 rounded-xl bg-primary hover:bg-primary/90 text-white disabled:opacity-30 flex items-center justify-center transition-all shrink-0">
+          <Send className="w-3 h-3" />
+        </button>
+      </form>
+    </div>
+  );
+}
 
 /* ──────────────── WaitingIllustration ──────────────── */
 function WaitingIllustration() {
@@ -565,6 +651,11 @@ export default function Room() {
 
   // Toolbar state
   const [compact, setCompact] = useState(false);
+  const [fullscreen, setFullscreen] = useState(false);
+  const [fsChatOpen, setFsChatOpen] = useState(false);
+  const [fsChatMinimized, setFsChatMinimized] = useState(false);
+  const [fsUnread, setFsUnread] = useState(0);
+  const prevChatLenRef = useRef(0);
   const [hostActive, setHostActive] = useState(true);
   const [themeId, setThemeId] = useState("cream");
   const [bgImageUrl, setBgImageUrl] = useState<string>(() => {
@@ -669,6 +760,16 @@ export default function Room() {
   const handleSendMessage = (text: string) => sendAction({ type: "chat", text });
   const handleLeave = () => { sessionStorage.removeItem("music-together-name"); setLocation("/"); };
 
+  // Track unread messages in fullscreen chat bubble
+  const chatMessages = roomState?.chatHistory || [];
+  useEffect(() => {
+    const newLen = chatMessages.length;
+    if (newLen > prevChatLenRef.current && fullscreen && (!fsChatOpen || fsChatMinimized)) {
+      setFsUnread(u => u + (newLen - prevChatLenRef.current));
+    }
+    prevChatLenRef.current = newLen;
+  }, [chatMessages.length, fullscreen, fsChatOpen, fsChatMinimized]);
+
   if (!clerkLoaded || isLoadingRoom || !userName) return (
     <div className="min-h-screen w-full flex items-center justify-center bg-background">
       <Loader2 className="w-8 h-8 animate-spin text-primary" />
@@ -753,6 +854,7 @@ export default function Room() {
         {/* Toolbar */}
         <div className="flex items-center gap-0.5 shrink-0">
           <ToolBtn icon={Minimize2} shortLabel="Thu gọn" label="Thu gọn player" onClick={() => setCompact(c => !c)} active={compact} />
+          <ToolBtn icon={Maximize2} shortLabel="Toàn màn hình" label="Xem toàn màn hình" onClick={() => { setFullscreen(f => !f); setFsChatOpen(false); setFsChatMinimized(false); setFsUnread(0); }} active={fullscreen} />
           <ToolBtn icon={Share2}    shortLabel="Chia sẻ"   label="Chia sẻ phòng" onClick={() => setShareOpen(true)} />
           <ToolBtn icon={CreditCard} shortLabel="Bưu thiếp" label="Bưu thiếp phòng" onClick={() => setPostcardOpen(true)} />
           <ToolBtn icon={Palette}   shortLabel="Giao diện"  label="Giao diện phòng" onClick={() => setThemeOpen(true)} />
@@ -776,11 +878,15 @@ export default function Room() {
       {/* ── Main ──────────────────────────────── */}
       <div className="flex-1 flex overflow-hidden min-h-0">
 
-        {/* Left: Player area */}
-        {!compact && (
-          <div className="flex-1 flex flex-col min-w-0 overflow-y-auto min-h-0 p-5 gap-4">
+        {/* Left: Player area (also becomes fullscreen overlay) */}
+        {(!compact || fullscreen) && (
+          <div className={fullscreen
+            ? "fixed inset-0 z-[200] bg-black flex flex-col"
+            : "flex-1 flex flex-col min-w-0 overflow-y-auto min-h-0 p-5 gap-4"}>
+
+            {/* YouTube player */}
             {showPlayer ? (
-              <>
+              <div className={fullscreen ? "flex-1 min-h-0 relative" : ""}>
                 <YoutubePlayer
                   currentTrack={roomState?.currentTrack || null}
                   playing={roomState?.playing || false}
@@ -791,36 +897,51 @@ export default function Room() {
                   onTrackEnd={handleTrackEnd}
                   onTimeUpdate={(ct, dur) => { setPlayerCurrentTime(ct); setPlayerDuration(dur); }}
                 />
-                <PlayerControls
-                  isHost={effectiveIsHost}
-                  playing={roomState?.playing || false}
-                  currentTime={playerCurrentTime}
-                  duration={playerDuration}
-                  volume={volume}
-                  repeatMode={roomState?.repeatMode ?? 'all'}
-                  shuffle={roomState?.shuffle ?? false}
-                  onPlayPause={handlePlayPause}
-                  onSkip={handleSkip}
-                  onPrev={handlePrev}
-                  onSeek={handleSeek}
-                  onVolumeChange={setVolume}
-                  onRepeat={handleRepeat}
-                  onShuffle={handleShuffle}
-                  disabled={!roomState?.currentTrack}
-                />
-              </>
-            ) : (
+              </div>
+            ) : !fullscreen && <WaitingIllustration />}
+
+            {/* Normal player controls */}
+            {!fullscreen && (showPlayer || roomState?.currentTrack) && (
+              <PlayerControls
+                isHost={effectiveIsHost}
+                playing={roomState?.playing || false}
+                currentTime={playerCurrentTime}
+                duration={playerDuration}
+                volume={volume}
+                repeatMode={roomState?.repeatMode ?? 'all'}
+                shuffle={roomState?.shuffle ?? false}
+                onPlayPause={handlePlayPause}
+                onSkip={handleSkip}
+                onPrev={handlePrev}
+                onSeek={handleSeek}
+                onVolumeChange={setVolume}
+                onRepeat={handleRepeat}
+                onShuffle={handleShuffle}
+                disabled={!roomState?.currentTrack}
+              />
+            )}
+
+            {/* ── Fullscreen overlay controls ── */}
+            {fullscreen && (
               <>
-                <WaitingIllustration />
-                {roomState?.currentTrack && (
+                {/* Exit button top-right */}
+                <button
+                  onClick={() => setFullscreen(false)}
+                  className="absolute top-4 right-4 z-10 w-10 h-10 rounded-full bg-black/50 hover:bg-black/70 text-white flex items-center justify-center transition-colors backdrop-blur-sm"
+                  title="Thoát toàn màn hình">
+                  <Minimize2 className="w-4 h-4" />
+                </button>
+
+                {/* Player controls bar at bottom */}
+                <div className="shrink-0 px-4 pb-4 pt-2" style={{ background: "linear-gradient(to top, rgba(0,0,0,0.75) 0%, transparent 100%)" }}>
                   <PlayerControls
                     isHost={effectiveIsHost}
-                    playing={roomState.playing}
+                    playing={roomState?.playing || false}
                     currentTime={playerCurrentTime}
                     duration={playerDuration}
                     volume={volume}
-                    repeatMode={roomState.repeatMode ?? 'all'}
-                    shuffle={roomState.shuffle ?? false}
+                    repeatMode={roomState?.repeatMode ?? 'all'}
+                    shuffle={roomState?.shuffle ?? false}
                     onPlayPause={handlePlayPause}
                     onSkip={handleSkip}
                     onPrev={handlePrev}
@@ -828,9 +949,48 @@ export default function Room() {
                     onVolumeChange={setVolume}
                     onRepeat={handleRepeat}
                     onShuffle={handleShuffle}
-                    disabled={false}
+                    disabled={!roomState?.currentTrack}
                   />
-                )}
+                </div>
+
+                {/* Chat bubble + panel (bottom-right, above controls) */}
+                <div className="absolute bottom-36 right-5 z-20 flex flex-col items-end gap-3">
+                  {fsChatOpen && !fsChatMinimized && (
+                    <div className="animate-in fade-in slide-in-from-bottom-4 duration-200">
+                      <FullscreenChat
+                        messages={chatMessages}
+                        currentUser={userName}
+                        myAvatarUrl={myAvatarUrl || undefined}
+                        userAvatars={roomState?.userAvatars}
+                        onSendMessage={handleSendMessage}
+                        onMinimize={() => setFsChatMinimized(true)}
+                        onClose={() => { setFsChatOpen(false); setFsChatMinimized(false); }}
+                      />
+                    </div>
+                  )}
+
+                  {/* Bubble button */}
+                  <button
+                    onClick={() => {
+                      if (fsChatOpen && !fsChatMinimized) {
+                        setFsChatMinimized(true);
+                      } else {
+                        setFsChatOpen(true);
+                        setFsChatMinimized(false);
+                        setFsUnread(0);
+                      }
+                    }}
+                    className="relative w-13 h-13 rounded-full shadow-2xl flex items-center justify-center transition-all hover:scale-110 active:scale-95"
+                    style={{ width: 52, height: 52, background: "linear-gradient(135deg,#c07080,#7a9e7e)" }}
+                    title="Chat">
+                    <MessageCircle className="w-6 h-6 text-white" />
+                    {fsUnread > 0 && (
+                      <span className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-red-500 text-white text-[10px] font-bold flex items-center justify-center shadow-sm animate-bounce">
+                        {fsUnread > 9 ? "9+" : fsUnread}
+                      </span>
+                    )}
+                  </button>
+                </div>
               </>
             )}
           </div>
