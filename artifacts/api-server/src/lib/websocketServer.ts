@@ -11,6 +11,7 @@ import {
   type Track,
 } from "./roomManager";
 import { logger } from "./logger";
+import { recordSession } from "./streakService";
 
 function broadcastPlayback(roomId: string, room: ReturnType<typeof getRoomState>) {
   if (!room) return;
@@ -64,6 +65,10 @@ export function setupWebSocketServer(server: http.Server): void {
         sendToSocket(ws, { type: "room_state", room });
         broadcast(roomId, { type: "listeners_update", listeners: room.listeners, hostName: room.hostName, userAvatars: room.userAvatars }, ws);
         logger.info({ roomId, userName }, "User joined room");
+        // Record streak session if ≥2 listeners are now present
+        if (room.listeners.length >= 2) {
+          recordSession(roomId).catch(() => {});
+        }
         return;
       }
 

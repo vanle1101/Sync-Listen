@@ -2,6 +2,7 @@ import { Router, type IRouter } from "express";
 import { db, roomsTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
 import { CreateRoomBody, GetRoomParams, GetRoomResponse } from "@workspace/api-zod";
+import { getStreak } from "../lib/streakService";
 
 const CHARS = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
 function genRoomId(): string {
@@ -47,6 +48,13 @@ router.get("/rooms/:roomId", async (req, res): Promise<void> => {
   }
 
   res.json(GetRoomResponse.parse({ ...room, createdAt: room.createdAt.toISOString() }));
+});
+
+router.get("/rooms/:roomId/streak", async (req, res): Promise<void> => {
+  const roomId = Array.isArray(req.params.roomId) ? req.params.roomId[0] : req.params.roomId;
+  if (!roomId) { res.status(400).json({ error: "Missing roomId" }); return; }
+  const result = await getStreak(roomId);
+  res.json(result);
 });
 
 export default router;

@@ -684,6 +684,7 @@ export default function Room() {
   }, []);
 
   const [myAvatarUrl, setMyAvatarUrl] = useState<string>("");
+  const [streak, setStreak] = useState(0);
 
   useEffect(() => {
     if (!clerkLoaded) return;
@@ -717,6 +718,16 @@ export default function Room() {
     prev.filter(l => !curr.includes(l)).forEach(l => addActivity(`${l} đã rời phòng`));
     prevListenersRef.current = curr;
   }, [roomState?.listeners, addActivity]);
+
+  // Fetch streak whenever listeners change (new person joins may create a session)
+  const listenerCount = roomState?.listeners.length ?? 0;
+  useEffect(() => {
+    if (!roomId) return;
+    fetch(`/api/rooms/${roomId}/streak`)
+      .then(r => r.ok ? r.json() : null)
+      .then(d => { if (d && typeof d.streak === 'number') setStreak(d.streak); })
+      .catch(() => {});
+  }, [roomId, listenerCount]);
 
   useEffect(() => {
     if (roomState?.hostName && roomId) saveRecentRoom(roomId, roomState.hostName);
@@ -821,7 +832,7 @@ export default function Room() {
               {roomState?.hostName ?? "..."}
             </span>
           </div>
-          {/* Row 2: code · listeners · host badge */}
+          {/* Row 2: code · listeners · host badge · streak */}
           <div className="flex items-center gap-1.5 text-[10px] text-foreground/45">
             <span className="font-mono font-semibold tracking-wide">{roomId}</span>
             <span className="text-foreground/20">·</span>
@@ -837,6 +848,14 @@ export default function Room() {
               <>
                 <span className="text-foreground/20">·</span>
                 <span className="text-[10px] font-semibold text-primary">🗳️ Dân chủ</span>
+              </>
+            )}
+            {streak > 0 && (
+              <>
+                <span className="text-foreground/20">·</span>
+                <span className="text-[10px] font-bold text-orange-500/80 flex items-center gap-0.5">
+                  🔥 {streak} ngày
+                </span>
               </>
             )}
           </div>
