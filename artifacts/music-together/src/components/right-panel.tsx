@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import { Track, ChatMessage } from "@/lib/types";
 import { Input } from "@/components/ui/input";
-import { Send, Smile, X, Plus, Search, Loader2, Check, Trash2, Play, Bell, BellOff, Mic, MicOff, ImagePlus, ChevronDown, Music2, Link } from "lucide-react";
+import { Send, Smile, X, Plus, Search, Loader2, Check, Trash2, Play, Bell, Mic, MicOff, ImagePlus, ChevronDown, Music2, Link } from "lucide-react";
 import { useYoutubeSearch, getYoutubeSearchQueryKey } from "@workspace/api-client-react";
 import Picker from "@emoji-mart/react";
 import data from "@emoji-mart/data";
@@ -30,14 +30,12 @@ async function compressImage(file: File, maxPx = 900): Promise<string> {
 }
 
 const SOUNDS = [
-  { id: "ding",   icon: "🔔", label: "Chuông nhẹ" },
-  { id: "pop",    icon: "💬", label: "Tin nhắn"   },
-  { id: "chime",  icon: "🎵", label: "Nhạc nhẹ"   },
-  { id: "silent", icon: "🔕", label: "Im lặng"     },
+  { id: "ding",  icon: "🔔", label: "Chuông nhẹ" },
+  { id: "pop",   icon: "💬", label: "Tin nhắn"   },
+  { id: "chime", icon: "🎵", label: "Nhạc nhẹ"   },
 ];
 
 function playNotifSound(id: string) {
-  if (id === "silent") return;
   try {
     const ctx = new AudioContext();
     const play = (freq: number, start: number, dur: number, type: OscillatorType = "sine", vol = 0.25) => {
@@ -101,10 +99,9 @@ function SoundPicker({ soundId, onChange }: { soundId: string; onChange: (id: st
   return (
     <div ref={ref} className="relative ml-auto">
       <button onClick={() => setOpen(o => !o)}
-        className={`flex items-center gap-1 px-2.5 py-2 rounded-xl text-xs font-semibold transition-colors
-          ${soundId === "silent" ? "text-muted-foreground/40" : "text-primary border border-primary/30 bg-primary/5"}`}>
-        {soundId === "silent" ? <BellOff className="w-3.5 h-3.5" /> : <Bell className="w-3.5 h-3.5" />}
-        <span className="hidden sm:inline">{soundId === "silent" ? "OFF" : "ON"}</span>
+        className="flex items-center gap-1 px-2.5 py-2 rounded-xl text-xs font-semibold transition-colors text-primary border border-primary/30 bg-primary/5">
+        <Bell className="w-3.5 h-3.5" />
+        <span className="hidden sm:inline">ON</span>
         <ChevronDown className={`w-3 h-3 transition-transform ${open ? "rotate-180" : ""}`} />
       </button>
 
