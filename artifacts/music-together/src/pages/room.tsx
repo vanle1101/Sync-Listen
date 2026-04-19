@@ -9,7 +9,7 @@ import { PlayerControls } from "@/components/player-controls";
 import { RightPanel } from "@/components/right-panel";
 import {
   Music, Loader2, Copy, LogOut, Minimize2, Share2, CreditCard,
-  Palette, Coffee, UserCheck, Settings, Globe, Users, X, Download, Check
+  Palette, Coffee, UserCheck, Settings, Globe, Users, X, Download, Check, Heart
 } from "lucide-react";
 import { useGetRoom, getGetRoomQueryKey } from "@workspace/api-client-react";
 
@@ -284,23 +284,88 @@ function ModalBase({ title, children, onClose }: { title: string; children: Reac
 }
 
 /* ──────────────── Toolbar Button ──────────────── */
-function ToolBtn({ icon: Icon, label, onClick, active = false, accent = false, disabled = false, title }: {
-  icon: any; label: string; onClick: () => void; active?: boolean; accent?: boolean; disabled?: boolean; title?: string;
+function ToolBtn({ icon: Icon, label, onClick, active = false, accent = false, disabled = false }: {
+  icon: any; label: string; onClick: () => void; active?: boolean; accent?: boolean; disabled?: boolean;
 }) {
   return (
     <button
       onClick={onClick}
       disabled={disabled}
-      title={title ?? label}
-      className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium transition-all whitespace-nowrap select-none
-        ${accent ? 'bg-[#f5922f] hover:bg-[#e07a20] text-white shadow-sm' :
-          active ? 'bg-primary/15 text-primary border border-primary/20' :
-          'text-muted-foreground hover:bg-primary/8 hover:text-primary'}
-        ${disabled ? 'opacity-40 cursor-not-allowed' : ''}`}
+      title={label}
+      className={`flex items-center justify-center w-8 h-8 rounded-xl text-xs font-medium transition-all select-none shrink-0
+        ${accent ? 'bg-[#f5922f]/15 hover:bg-[#f5922f]/25 text-[#f5922f]' :
+          active ? 'bg-primary/15 text-primary' :
+          'text-muted-foreground/60 hover:bg-primary/8 hover:text-primary'}
+        ${disabled ? 'opacity-30 cursor-not-allowed' : ''}`}
     >
-      <Icon className="w-3.5 h-3.5 flex-shrink-0" />
-      <span className="hidden lg:inline">{label}</span>
+      <Icon className="w-4 h-4" />
     </button>
+  );
+}
+
+/* ──────────────── Donate Modal ──────────────── */
+function DonateModal({ onClose }: { onClose: () => void }) {
+  const [copied, setCopied] = useState(false);
+  const stk = "1020334219";
+  const bank = "VCB";
+  const owner = "LE HONG VAN";
+  const qrUrl = `https://img.vietqr.io/image/${bank}-${stk}-compact2.png?amount=0&addInfo=Music%20Together&accountName=${encodeURIComponent(owner)}`;
+
+  const copySTK = () => {
+    navigator.clipboard.writeText(stk).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    });
+  };
+
+  return (
+    <ModalBase title="☕ Mời một tách cafe" onClose={onClose}>
+      <p className="text-sm text-muted-foreground text-center mb-5">
+        Nếu thấy app hay, bạn có thể ủng hộ mình một tách cafe nhé!
+      </p>
+      {/* QR code */}
+      <div className="flex justify-center mb-5">
+        <div className="bg-white rounded-2xl p-3 shadow-sm border border-primary/10">
+          <img
+            src={qrUrl}
+            alt="VietQR"
+            className="w-44 h-44 object-contain"
+            onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
+          />
+        </div>
+      </div>
+      {/* Bank info */}
+      <div className="bg-white/60 rounded-2xl border border-primary/10 p-4 space-y-3">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-xl flex items-center justify-center font-bold text-white text-sm shrink-0"
+            style={{ background: 'linear-gradient(135deg, #007B40, #00a550)' }}>
+            VCB
+          </div>
+          <div>
+            <p className="text-xs text-muted-foreground/50 uppercase tracking-wide">Ngân hàng</p>
+            <p className="text-sm font-semibold text-foreground">Vietcombank</p>
+          </div>
+        </div>
+        <div className="flex items-center justify-between bg-primary/3 rounded-xl px-3 py-2.5">
+          <div>
+            <p className="text-[10px] text-muted-foreground/50 uppercase tracking-wide mb-0.5">Số tài khoản</p>
+            <p className="text-base font-mono font-bold text-foreground tracking-wider">{stk}</p>
+          </div>
+          <button
+            onClick={copySTK}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-primary/10 hover:bg-primary/15 text-primary text-xs font-medium transition-all"
+          >
+            {copied ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
+            {copied ? "Đã copy" : "Copy"}
+          </button>
+        </div>
+        <div className="px-1">
+          <p className="text-[10px] text-muted-foreground/50 uppercase tracking-wide mb-0.5">Chủ tài khoản</p>
+          <p className="text-sm font-semibold text-foreground">{owner}</p>
+        </div>
+      </div>
+      <p className="text-center text-xs text-muted-foreground/40 mt-4">Nội dung CK: <span className="font-medium">Music Together</span></p>
+    </ModalBase>
   );
 }
 
@@ -318,7 +383,6 @@ export default function Room() {
 
   // Toolbar state
   const [compact, setCompact] = useState(false);
-  const [coffeeBreak, setCoffeeBreak] = useState(false);
   const [hostActive, setHostActive] = useState(true);
   const [themeId, setThemeId] = useState("cream");
 
@@ -327,6 +391,7 @@ export default function Room() {
   const [postcardOpen, setPostcardOpen] = useState(false);
   const [themeOpen, setThemeOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [donateOpen, setDonateOpen] = useState(false);
 
   // Activity log
   const [activities, setActivities] = useState<{ text: string; time: string }[]>([]);
@@ -402,7 +467,7 @@ export default function Room() {
     </div>
   );
 
-  const showPlayer = !!roomState?.currentTrack && !coffeeBreak;
+  const showPlayer = !!roomState?.currentTrack;
 
   return (
     <div className={`h-screen overflow-hidden w-full flex flex-col font-sans bg-gradient-to-br ${currentTheme.bg} relative`}>
@@ -456,13 +521,13 @@ export default function Room() {
         {/* Spacer */}
         <div className="flex-1" />
 
-        {/* Toolbar buttons */}
-        <div className="flex items-center gap-1 overflow-x-auto">
+        {/* Toolbar buttons — icon only, hover title */}
+        <div className="flex items-center gap-0.5 shrink-0">
           <ToolBtn icon={Minimize2} label="Thu gọn" onClick={() => setCompact(c => !c)} active={compact} />
           <ToolBtn icon={Share2} label="Chia sẻ" onClick={() => setShareOpen(true)} />
           <ToolBtn icon={CreditCard} label="Bưu thiếp phòng" onClick={() => setPostcardOpen(true)} />
           <ToolBtn icon={Palette} label="Giao diện phòng" onClick={() => setThemeOpen(true)} />
-          <ToolBtn icon={Coffee} label="Tách cafe" onClick={() => setCoffeeBreak(c => !c)} accent={coffeeBreak} active={coffeeBreak} />
+          <ToolBtn icon={Coffee} label="Tách cafe cho admin ☕" onClick={() => setDonateOpen(true)} accent />
           <ToolBtn
             icon={UserCheck}
             label={hostActive ? "Dẫn chủ ON" : "Dẫn chủ OFF"}
@@ -481,19 +546,7 @@ export default function Room() {
         {/* Left: Player area */}
         {!compact && (
           <div className="flex-1 flex flex-col min-w-0 overflow-y-auto min-h-0 p-5 gap-4">
-            {coffeeBreak ? (
-              <div className="flex-1 flex flex-col items-center justify-center gap-6 animate-in fade-in duration-500">
-                <div className="text-6xl animate-bounce">☕</div>
-                <div className="text-center">
-                  <h2 className="text-2xl font-serif italic font-semibold text-foreground/70">Đang nghỉ giải lao</h2>
-                  <p className="text-sm text-muted-foreground/60 mt-2">Nhạc tạm dừng. Nhấn "Tách cafe" lần nữa để tiếp tục.</p>
-                </div>
-                <button onClick={() => setCoffeeBreak(false)}
-                  className="px-8 py-3 bg-[#f5922f] text-white rounded-2xl font-medium hover:bg-[#e07a20] transition-colors shadow-md">
-                  Tiếp tục nghe nhạc
-                </button>
-              </div>
-            ) : showPlayer ? (
+            {showPlayer ? (
               <>
                 <YoutubePlayer
                   currentTrack={roomState?.currentTrack || null}
@@ -575,6 +628,7 @@ export default function Room() {
       {postcardOpen && <PostcardModal roomId={roomId} hostName={roomState?.hostName ?? ""} onClose={() => setPostcardOpen(false)} />}
       {themeOpen    && <ThemeModal    currentTheme={themeId} onSelect={setThemeId} onClose={() => setThemeOpen(false)} />}
       {settingsOpen && <SettingsModal roomId={roomId} hostName={roomState?.hostName ?? ""} listeners={roomState?.listeners ?? []} onClose={() => setSettingsOpen(false)} />}
+      {donateOpen   && <DonateModal   onClose={() => setDonateOpen(false)} />}
     </div>
   );
 }
