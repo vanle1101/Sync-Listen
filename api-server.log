@@ -1,0 +1,40 @@
+
+> @workspace/api-server@0.0.0 start C:\Users\lehon\OneDrive\Desktop\Sync-Listen\Sync-Listen\artifacts\api-server
+> node --enable-source-maps ./dist/index.mjs
+
+[13:13:31.066] [32mINFO[39m (2780): [36mWebSocket server set up at /ws[39m
+[13:13:31.068] [32mINFO[39m (2780): [36mServer listening[39m
+    [35mport[39m: 3001
+[13:13:36.774] [32mINFO[39m (2780): [36mrequest completed[39m
+    [35mreq[39m: {
+      "id": 1,
+      "method": "GET",
+      "url": "/api/healthz"
+    }
+    [35mres[39m: {
+      "statusCode": 200
+    }
+    [35mresponseTime[39m: 23
+[13:14:33.362] [32mINFO[39m (2780): [36mrequest completed[39m
+    [35mreq[39m: {
+      "id": 2,
+      "method": "POST",
+      "url": "/api/rooms"
+    }
+    [35mres[39m: {
+      "statusCode": 400
+    }
+    [35mresponseTime[39m: 12
+[13:16:48.489] [32mINFO[39m (2780): [36mrequest completed[39m
+    [35mreq[39m: {
+      "id": 3,
+      "method": "GET",
+      "url": "/"
+    }
+    [35mres[39m: {
+      "statusCode": 404
+    }
+    [35mresponseTime[39m: 5
+^CC:\Users\lehon\OneDrive\Desktop\Sync-Listen\Sync-Listen\artifacts\api-server:
+ ERR_PNPM_RECURSIVE_RUN_FIRST_FAIL  @workspace/api-server@0.0.0 start: `node --enable-source-maps ./dist/index.mjs`
+Exit status 3221225786
