@@ -14,15 +14,20 @@ export interface ChatMessage {
   timestamp: string;
 }
 
+export type RepeatMode = 'none' | 'one' | 'all';
+
 export interface RoomState {
   roomId: string;
   hostName: string;
   listeners: string[];
   playlist: Track[];
+  playedTracks: Track[];
   currentTrack: Track | null;
   playing: boolean;
   currentTime: number;
   chatHistory: ChatMessage[];
+  repeatMode: RepeatMode;
+  shuffle: boolean;
 }
 
 interface ListenerInfo {
@@ -40,10 +45,13 @@ export function getOrCreateRoomState(roomId: string, hostName: string): RoomStat
       hostName,
       listeners: [],
       playlist: [],
+      playedTracks: [],
       currentTrack: null,
       playing: false,
       currentTime: 0,
       chatHistory: [],
+      repeatMode: 'all',
+      shuffle: false,
     });
   }
   return rooms.get(roomId)!;
@@ -100,4 +108,15 @@ export function sendToSocket(ws: WebSocket, message: object): void {
   if (ws.readyState === WebSocket.OPEN) {
     ws.send(JSON.stringify(message));
   }
+}
+
+/** Pick next track respecting shuffle. Returns undefined if no more tracks. */
+export function pickNextTrack(room: RoomState): Track | undefined {
+  if (room.playlist.length === 0) return undefined;
+  if (room.shuffle) {
+    const idx = Math.floor(Math.random() * room.playlist.length);
+    const [track] = room.playlist.splice(idx, 1);
+    return track;
+  }
+  return room.playlist.shift();
 }

@@ -12,6 +12,17 @@ import { ChatPanel } from "@/components/chat-panel";
 import { Copy, LogOut, Loader2, Music, MessageSquare, MessageSquareOff } from "lucide-react";
 import { useGetRoom, getGetRoomQueryKey } from "@workspace/api-client-react";
 
+function saveRecentRoom(roomId: string, hostName: string) {
+  try {
+    const key = "music-together-rooms";
+    const raw = localStorage.getItem(key);
+    const rooms: { id: string; hostName: string; visitedAt: number }[] = raw ? JSON.parse(raw) : [];
+    const filtered = rooms.filter((r) => r.id !== roomId);
+    filtered.unshift({ id: roomId, hostName, visitedAt: Date.now() });
+    localStorage.setItem(key, JSON.stringify(filtered.slice(0, 8)));
+  } catch {}
+}
+
 export default function Room() {
   const params = useParams();
   const roomId = params.roomId as string;
@@ -28,8 +39,8 @@ export default function Room() {
     const name = sessionStorage.getItem("music-together-name");
     if (!name) {
       toast({
-        title: "Name required",
-        description: "Please enter your name to join a room.",
+        title: "Cần nhập tên",
+        description: "Vui lòng nhập tên trước khi vào phòng.",
         variant: "destructive"
       });
       setLocation("/");
@@ -44,11 +55,18 @@ export default function Room() {
 
   const { roomState, connected, error: wsError, sendAction } = useWebSocket(roomId, userName);
 
+  // Save recent room to localStorage once hostName is known
+  useEffect(() => {
+    if (roomState?.hostName && roomId) {
+      saveRecentRoom(roomId, roomState.hostName);
+    }
+  }, [roomId, roomState?.hostName]);
+
   useEffect(() => {
     if (roomError) {
       toast({
-        title: "Room not found",
-        description: "This room doesn't exist or has been closed.",
+        title: "Phòng không tìm thấy",
+        description: "Phòng này không tồn tại hoặc đã bị đóng.",
         variant: "destructive"
       });
       setLocation("/");
@@ -60,8 +78,8 @@ export default function Room() {
   const handleCopyLink = () => {
     navigator.clipboard.writeText(window.location.href);
     toast({
-      title: "Link copied!",
-      description: "Share this link with your friends to invite them.",
+      title: "Đã sao chép link!",
+      description: "Chia sẻ link này để mời bạn bè vào cùng.",
     });
   };
 
@@ -108,9 +126,20 @@ export default function Room() {
     sendAction({ type: "skip" });
   };
 
+  const handlePrev = () => {
+    sendAction({ type: "prev_track" });
+  };
+
+  const handleRepeat = () => {
+    sendAction({ type: "set_repeat" });
+  };
+
+  const handleShuffle = () => {
+    sendAction({ type: "set_shuffle" });
+  };
+
   const handlePlayerStateChange = (playing: boolean, currentTime: number) => {
     if (!isHost) return;
-    // We send periodic seeks or play_pause updates
     sendAction({ type: "seek", currentTime });
   };
 
@@ -137,9 +166,13 @@ export default function Room() {
       {/* Header */}
       <header className="h-20 border-b border-primary/5 bg-white/40 backdrop-blur-md flex items-center justify-between px-8 shrink-0 z-20 sticky top-0">
         <div className="flex items-center gap-4">
-          <div className="w-10 h-10 rounded-2xl bg-primary/10 flex items-center justify-center border border-primary/20 soft-glow">
+          <button
+            onClick={() => setLocation("/")}
+            className="w-10 h-10 rounded-2xl bg-primary/10 flex items-center justify-center border border-primary/20 soft-glow hover:bg-primary/20 transition-colors"
+            title="Về trang chủ"
+          >
             <Music className="w-5 h-5 text-primary" />
-          </div>
+          </button>
           <h1 className="font-serif text-2xl tracking-tight hidden sm:block italic font-medium text-foreground">Music Together</h1>
           <div className="h-6 w-px bg-primary/10 mx-2 hidden sm:block"></div>
           <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground bg-primary/5 px-4 py-1.5 rounded-full border border-primary/10">
@@ -192,7 +225,6 @@ export default function Room() {
 
       {/* Main Content */}
       <main className="flex-1 overflow-hidden flex flex-col lg:flex-row p-6 gap-6 z-10 relative min-h-0">
-        {/* Background decorations */}
         <div className="absolute top-0 right-0 w-[40%] h-[40%] bg-primary/5 rounded-full blur-[120px] pointer-events-none -z-10"></div>
         <div className="absolute bottom-0 left-0 w-[30%] h-[30%] bg-secondary/5 rounded-full blur-[100px] pointer-events-none -z-10"></div>
         
@@ -216,10 +248,15 @@ export default function Room() {
               currentTime={playerCurrentTime}
               duration={playerDuration}
               volume={volume}
+              repeatMode={roomState?.repeatMode ?? 'all'}
+              shuffle={roomState?.shuffle ?? false}
               onPlayPause={handlePlayPause}
               onSkip={handleSkip}
+              onPrev={handlePrev}
               onSeek={handleSeek}
               onVolumeChange={handleVolumeChange}
+              onRepeat={handleRepeat}
+              onShuffle={handleShuffle}
               disabled={!roomState?.currentTrack}
             />
           </div>

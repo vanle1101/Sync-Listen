@@ -1,17 +1,48 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useLocation } from "wouter";
 import { useCreateRoom } from "@workspace/api-client-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Loader2, Music } from "lucide-react";
+import { Loader2, Music, Clock, ArrowRight } from "lucide-react";
+
+interface RecentRoom {
+  id: string;
+  hostName: string;
+  visitedAt: number;
+}
+
+function getRecentRooms(): RecentRoom[] {
+  try {
+    const raw = localStorage.getItem("music-together-rooms");
+    return raw ? JSON.parse(raw) : [];
+  } catch {
+    return [];
+  }
+}
+
+function timeAgo(ts: number): string {
+  const diff = Date.now() - ts;
+  const minutes = Math.floor(diff / 60000);
+  if (minutes < 1) return "vừa xong";
+  if (minutes < 60) return `${minutes} phút trước`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours} giờ trước`;
+  const days = Math.floor(hours / 24);
+  return `${days} ngày trước`;
+}
 
 export default function Home() {
   const [, setLocation] = useLocation();
   const [name, setName] = useState("");
   const [joinRoomId, setJoinRoomId] = useState("");
+  const [recentRooms, setRecentRooms] = useState<RecentRoom[]>([]);
   
   const createRoom = useCreateRoom();
+
+  useEffect(() => {
+    setRecentRooms(getRecentRooms());
+  }, []);
 
   const handleCreateRoom = (e: React.FormEvent) => {
     e.preventDefault();
@@ -19,7 +50,6 @@ export default function Home() {
     
     createRoom.mutate({ data: { hostName: name.trim() } }, {
       onSuccess: (room) => {
-        // Store name in session storage so it can be picked up by the room page
         sessionStorage.setItem("music-together-name", name.trim());
         setLocation(`/room/${room.id}`);
       }
@@ -32,7 +62,6 @@ export default function Home() {
     
     sessionStorage.setItem("music-together-name", name.trim());
     
-    // Handle full URL or just ID
     let id = joinRoomId.trim();
     if (id.includes("/room/")) {
       id = id.split("/room/")[1];
@@ -41,13 +70,22 @@ export default function Home() {
     setLocation(`/room/${id}`);
   };
 
+  const handleJoinRecent = (room: RecentRoom) => {
+    if (!name.trim()) {
+      setJoinRoomId(room.id);
+      return;
+    }
+    sessionStorage.setItem("music-together-name", name.trim());
+    setLocation(`/room/${room.id}`);
+  };
+
   return (
     <div className="min-h-screen w-full flex items-center justify-center p-4 relative overflow-hidden petal-bg">
-      {/* Background decoration */}
       <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-primary/5 rounded-full blur-[100px] pointer-events-none"></div>
       <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-secondary/5 rounded-full blur-[100px] pointer-events-none"></div>
       
-      <div className="w-full max-w-4xl grid md:grid-cols-2 gap-12 items-center z-10 relative">
+      <div className="w-full max-w-5xl grid md:grid-cols-2 gap-12 items-start z-10 relative">
+        {/* Left: branding + recent rooms */}
         <div className="space-y-6 text-center md:text-left">
           <div className="inline-flex items-center justify-center p-4 bg-white/80 rounded-3xl border border-primary/10 mb-4 shadow-sm soft-glow">
             <Music className="w-8 h-8 text-primary" />
@@ -59,8 +97,39 @@ export default function Home() {
           <p className="text-xl text-muted-foreground max-w-md mx-auto md:mx-0 font-light leading-relaxed">
             Nghe nhạc cùng nhau. Tạo phòng, mời bạn bè và chia sẻ giai điệu yêu thích.
           </p>
+
+          {/* Recent rooms */}
+          {recentRooms.length > 0 && (
+            <div className="mt-6 space-y-3">
+              <div className="flex items-center gap-2 text-sm text-muted-foreground/70">
+                <Clock className="w-3.5 h-3.5" />
+                <span className="font-medium tracking-wide uppercase text-xs">Phòng đã ghé thăm</span>
+              </div>
+              <div className="space-y-2">
+                {recentRooms.slice(0, 5).map((room) => (
+                  <button
+                    key={room.id}
+                    onClick={() => handleJoinRecent(room)}
+                    className="w-full flex items-center justify-between gap-3 bg-white/60 hover:bg-white/90 border border-primary/10 rounded-2xl px-4 py-3 transition-all hover:shadow-sm hover:border-primary/20 group text-left"
+                  >
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div className="w-8 h-8 rounded-xl bg-primary/10 flex items-center justify-center flex-shrink-0">
+                        <Music className="w-4 h-4 text-primary" />
+                      </div>
+                      <div className="min-w-0">
+                        <p className="text-sm font-medium text-foreground truncate">Phòng của {room.hostName}</p>
+                        <p className="text-xs text-muted-foreground/60">{timeAgo(room.visitedAt)}</p>
+                      </div>
+                    </div>
+                    <ArrowRight className="w-4 h-4 text-primary/40 group-hover:text-primary/70 flex-shrink-0 transition-colors" />
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
 
+        {/* Right: join form */}
         <Card className="bloom-card p-4 relative overflow-hidden border-none">
           <CardHeader className="pb-6 text-center">
             <CardTitle className="text-3xl font-serif text-foreground italic font-medium">Vào phòng</CardTitle>

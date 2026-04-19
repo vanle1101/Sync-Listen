@@ -161,18 +161,86 @@ export function YoutubePlayer({
     return () => { if (timeUpdateInterval.current) clearInterval(timeUpdateInterval.current); };
   }, [isReady, onTimeUpdate]);
 
+  // Media Session API for background/lock screen playback
+  useEffect(() => {
+    if (!('mediaSession' in navigator)) return;
+    if (currentTrack) {
+      navigator.mediaSession.metadata = new MediaMetadata({
+        title: currentTrack.title,
+        artist: currentTrack.channelTitle,
+        artwork: [{ src: currentTrack.thumbnail, sizes: '120x90', type: 'image/jpeg' }],
+      });
+    } else {
+      navigator.mediaSession.metadata = null;
+    }
+  }, [currentTrack]);
+
+  useEffect(() => {
+    if (!('mediaSession' in navigator)) return;
+    navigator.mediaSession.playbackState = playing ? 'playing' : 'paused';
+  }, [playing]);
+
+  useEffect(() => {
+    if (!('mediaSession' in navigator) || !isHost || !isReady) return;
+    navigator.mediaSession.setActionHandler('play', () => {
+      playerRef.current?.playVideo();
+      onStateChange?.(true, playerRef.current?.getCurrentTime() || 0);
+    });
+    navigator.mediaSession.setActionHandler('pause', () => {
+      playerRef.current?.pauseVideo();
+      onStateChange?.(false, playerRef.current?.getCurrentTime() || 0);
+    });
+    navigator.mediaSession.setActionHandler('nexttrack', () => onTrackEnd?.());
+    return () => {
+      try {
+        navigator.mediaSession.setActionHandler('play', null);
+        navigator.mediaSession.setActionHandler('pause', null);
+        navigator.mediaSession.setActionHandler('nexttrack', null);
+      } catch {}
+    };
+  }, [isHost, isReady]);
+
   return (
     <div className="relative w-full pt-[56.25%] bg-white rounded-[2rem] overflow-hidden border border-primary/10 group shadow-2xl soft-glow">
-      <div className="absolute inset-0 z-0 pointer-events-none opacity-90 group-hover:opacity-100 transition-opacity duration-700">
+      {/* YouTube player — hidden when no track to avoid black background */}
+      <div
+        className="absolute inset-0 z-0 pointer-events-none opacity-90 group-hover:opacity-100 transition-opacity duration-700"
+        style={{ visibility: currentTrack ? 'visible' : 'hidden' }}
+      >
         <div ref={containerRef} id="youtube-player" className="w-full h-full scale-[1.1]"></div>
       </div>
 
+      {/* Cute placeholder when no track */}
       {!currentTrack && (
-        <div className="absolute inset-0 z-10 flex flex-col items-center justify-center text-primary/40">
-          <div className="w-20 h-20 rounded-full bg-primary/5 flex items-center justify-center mb-6 soft-glow">
-            <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="text-primary"><path d="M9 18V5l12-2v13"></path><circle cx="6" cy="18" r="3"></circle><circle cx="18" cy="16" r="3"></circle></svg>
+        <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-5"
+          style={{ background: 'linear-gradient(135deg, #fdf6f0 0%, #fce8e8 50%, #eef5ef 100%)' }}>
+          <div className="relative flex items-center justify-center">
+            {/* Vinyl record */}
+            <svg width="110" height="110" viewBox="0 0 110 110" fill="none" className="animate-[spin_8s_linear_infinite]">
+              <circle cx="55" cy="55" r="54" fill="#3d2b1f" stroke="#5a3e2b" strokeWidth="2"/>
+              <circle cx="55" cy="55" r="38" fill="#2a1f14" stroke="#5a3e2b" strokeWidth="1.5"/>
+              <circle cx="55" cy="55" r="28" fill="#1a120a" stroke="#3d2b1f" strokeWidth="1"/>
+              <circle cx="55" cy="55" r="18" fill="#2a1f14" stroke="#5a3e2b" strokeWidth="1"/>
+              <circle cx="55" cy="55" r="8" fill="#c07060" stroke="#e09080" strokeWidth="1.5"/>
+              <circle cx="55" cy="55" r="3" fill="#f5e8e0"/>
+              {/* Light reflection */}
+              <path d="M20 35 Q55 10 90 35" stroke="rgba(255,255,255,0.07)" strokeWidth="12" fill="none" strokeLinecap="round"/>
+            </svg>
+            {/* Tone arm */}
+            <div className="absolute top-1 right-4 w-1 h-14 rounded-full origin-top"
+              style={{ background: 'linear-gradient(to bottom, #c8a882, #a07050)', transform: 'rotate(28deg)', boxShadow: '0 2px 6px rgba(0,0,0,0.2)' }} />
           </div>
-          <p className="text-lg font-serif italic font-medium tracking-wide">Chưa có bài hát đang phát</p>
+
+          {/* Floating notes */}
+          <div className="absolute top-4 left-8 text-2xl animate-bounce" style={{ animationDelay: '0s', animationDuration: '2.5s', color: '#c07080' }}>♪</div>
+          <div className="absolute top-8 right-10 text-xl animate-bounce" style={{ animationDelay: '0.8s', animationDuration: '3s', color: '#7a9e7e' }}>♫</div>
+          <div className="absolute bottom-8 left-12 text-lg animate-bounce" style={{ animationDelay: '1.4s', animationDuration: '2.8s', color: '#c07080' }}>♩</div>
+          <div className="absolute bottom-6 right-8 text-xl animate-bounce" style={{ animationDelay: '0.4s', animationDuration: '3.2s', color: '#7a9e7e' }}>♬</div>
+
+          <div className="text-center mt-1">
+            <p className="text-base font-serif italic font-semibold text-[#8c5f6a]">Chưa có bài hát đang phát</p>
+            <p className="text-xs text-[#a07060]/70 mt-1">Thêm bài vào danh sách để bắt đầu</p>
+          </div>
         </div>
       )}
 

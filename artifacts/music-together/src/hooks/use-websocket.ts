@@ -77,7 +77,18 @@ export function useWebSocket(roomId: string, userName: string | null) {
               } : null);
               break;
             case "playlist_update":
-              setRoomState(prev => prev ? { ...prev, playlist: msg.playlist } : null);
+              setRoomState(prev => prev ? {
+                ...prev,
+                playlist: msg.playlist,
+                playedTracks: msg.playedTracks ?? prev.playedTracks ?? [],
+              } : null);
+              break;
+            case "settings_update":
+              setRoomState(prev => prev ? {
+                ...prev,
+                repeatMode: msg.repeatMode ?? prev.repeatMode,
+                shuffle: msg.shuffle ?? prev.shuffle,
+              } : null);
               break;
             case "listeners_update":
               setRoomState(prev => prev ? { ...prev, listeners: msg.listeners, hostName: msg.hostName } : null);

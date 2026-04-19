@@ -12,13 +12,18 @@ export interface ChatMessage {
   timestamp: string;
 }
 
+export type RepeatMode = 'none' | 'one' | 'all';
+
 export interface RoomState {
   roomId: string;
   hostName: string;
   listeners: string[];
   playlist: Track[];
+  playedTracks: Track[];
   currentTrack: Track | null;
   playing: boolean;
   currentTime: number;
   chatHistory: ChatMessage[];
+  repeatMode: RepeatMode;
+  shuffle: boolean;
 }
