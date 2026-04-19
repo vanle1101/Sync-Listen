@@ -95,6 +95,15 @@
   --radius: 0.85rem;
 }
 
+/* ── Custom cursors (28×30px, scaled from 64×68) ── */
+*, *::before, *::after {
+  cursor: url('/cursor-arrow.png') 5 4, default !important;
+}
+
+a, button, [role="button"], input, select, textarea, label,
+[tabindex]:not([tabindex="-1"]), .cursor-pointer {
+  cursor: url('/cursor-pointer.png') 12 2, pointer !important;
+}
 
 /* ── Base ────────────────────────────────────────── */
 @layer base {
