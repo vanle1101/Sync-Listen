@@ -336,19 +336,22 @@ function PlaylistTab({ playlist, playedTracks, currentTrack, isHost, onAddTrack,
                 <p className="text-[10px] font-semibold text-muted-foreground/40 uppercase tracking-wider px-1 pt-1">Tiếp theo</p>
               )}
               {playlist.map((track, i) => (
-                <div key={`${track.videoId}-${i}`} className="group relative flex items-center gap-2.5 p-2.5 rounded-2xl hover:bg-white border border-transparent hover:shadow-sm hover:border-primary/10 transition-all"
-                  style={{ paddingRight: isHost ? "5rem" : "0.75rem" }}>
+                <div key={`${track.videoId}-${i}`} className="flex items-center gap-2 p-2.5 rounded-2xl hover:bg-white border border-transparent hover:shadow-sm hover:border-primary/10 transition-all">
                   <img src={track.thumbnail} alt="" className="w-12 h-10 rounded-xl object-cover flex-shrink-0" />
                   <div className="flex-1 min-w-0">
-                    <p className="text-xs font-semibold text-foreground line-clamp-2">{track.title}</p>
-                    <p className="text-[10px] text-muted-foreground/60">{track.channelTitle}</p>
+                    <p className="text-xs font-semibold text-foreground line-clamp-2 leading-snug">{track.title}</p>
+                    <p className="text-[10px] text-muted-foreground/60 mt-0.5">{track.channelTitle}</p>
                   </div>
                   {isHost && (
-                    <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1">
-                      <button onClick={() => onPlayTrack(i)} className="w-7 h-7 rounded-xl text-primary/60 hover:text-white hover:bg-primary flex items-center justify-center transition-all">
+                    <div className="flex items-center gap-1 shrink-0">
+                      <button onClick={() => onPlayTrack(i)}
+                        className="w-7 h-7 rounded-xl text-primary/60 hover:text-white hover:bg-primary flex items-center justify-center transition-all"
+                        title="Phát ngay">
                         <Play className="w-3.5 h-3.5 fill-current" />
                       </button>
-                      <button onClick={() => onRemoveTrack(i)} className="w-7 h-7 rounded-xl text-muted-foreground/30 hover:text-red-500 hover:bg-red-50 flex items-center justify-center transition-all">
+                      <button onClick={() => onRemoveTrack(i)}
+                        className="w-7 h-7 rounded-xl text-muted-foreground/30 hover:text-red-500 hover:bg-red-50 flex items-center justify-center transition-all"
+                        title="Xóa khỏi hàng đợi">
                         <Trash2 className="w-3.5 h-3.5" />
                       </button>
                     </div>
