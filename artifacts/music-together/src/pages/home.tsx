@@ -4,7 +4,7 @@ import { useCreateRoom } from "@workspace/api-client-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Loader2, Music, Clock, ArrowRight } from "lucide-react";
+import { Loader2, Music, Clock, ArrowRight, X } from "lucide-react";
 
 interface RecentRoom {
   id: string;
@@ -79,6 +79,18 @@ export default function Home() {
     setLocation(`/room/${room.id}`);
   };
 
+  const handleRemoveRecent = (e: React.MouseEvent, roomId: string) => {
+    e.stopPropagation();
+    try {
+      const key = "music-together-rooms";
+      const raw = localStorage.getItem(key);
+      const rooms: RecentRoom[] = raw ? JSON.parse(raw) : [];
+      const updated = rooms.filter((r) => r.id !== roomId);
+      localStorage.setItem(key, JSON.stringify(updated));
+      setRecentRooms(updated);
+    } catch {}
+  };
+
   return (
     <div className="min-h-screen w-full flex items-center justify-center p-4 relative overflow-hidden petal-bg">
       <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-primary/5 rounded-full blur-[100px] pointer-events-none"></div>
@@ -107,22 +119,33 @@ export default function Home() {
               </div>
               <div className="space-y-2">
                 {recentRooms.slice(0, 5).map((room) => (
-                  <button
+                  <div
                     key={room.id}
-                    onClick={() => handleJoinRecent(room)}
-                    className="w-full flex items-center justify-between gap-3 bg-white/60 hover:bg-white/90 border border-primary/10 rounded-2xl px-4 py-3 transition-all hover:shadow-sm hover:border-primary/20 group text-left"
+                    className="flex items-center gap-2 group"
                   >
-                    <div className="flex items-center gap-3 min-w-0">
-                      <div className="w-8 h-8 rounded-xl bg-primary/10 flex items-center justify-center flex-shrink-0">
-                        <Music className="w-4 h-4 text-primary" />
+                    <button
+                      onClick={() => handleJoinRecent(room)}
+                      className="flex-1 flex items-center justify-between gap-3 bg-white/60 hover:bg-white/90 border border-primary/10 rounded-2xl px-4 py-3 transition-all hover:shadow-sm hover:border-primary/20 group/btn text-left min-w-0"
+                    >
+                      <div className="flex items-center gap-3 min-w-0">
+                        <div className="w-8 h-8 rounded-xl bg-primary/10 flex items-center justify-center flex-shrink-0">
+                          <Music className="w-4 h-4 text-primary" />
+                        </div>
+                        <div className="min-w-0">
+                          <p className="text-sm font-medium text-foreground truncate">Phòng của {room.hostName}</p>
+                          <p className="text-xs text-muted-foreground/60">{timeAgo(room.visitedAt)}</p>
+                        </div>
                       </div>
-                      <div className="min-w-0">
-                        <p className="text-sm font-medium text-foreground truncate">Phòng của {room.hostName}</p>
-                        <p className="text-xs text-muted-foreground/60">{timeAgo(room.visitedAt)}</p>
-                      </div>
-                    </div>
-                    <ArrowRight className="w-4 h-4 text-primary/40 group-hover:text-primary/70 flex-shrink-0 transition-colors" />
-                  </button>
+                      <ArrowRight className="w-4 h-4 text-primary/40 group-hover/btn:text-primary/70 flex-shrink-0 transition-colors" />
+                    </button>
+                    <button
+                      onClick={(e) => handleRemoveRecent(e, room.id)}
+                      className="w-7 h-7 rounded-xl flex items-center justify-center text-muted-foreground/30 hover:text-primary/60 hover:bg-primary/5 transition-all opacity-0 group-hover:opacity-100 flex-shrink-0"
+                      title="Xóa khỏi lịch sử"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
                 ))}
               </div>
             </div>
