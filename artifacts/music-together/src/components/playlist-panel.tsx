@@ -1,6 +1,5 @@
 import { Track } from "@/lib/types";
 import { Button } from "@/components/ui/button";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { Trash2, Music } from "lucide-react";
 
 interface PlaylistPanelProps {
@@ -23,7 +22,7 @@ export function PlaylistPanel({ playlist, currentTrack, onRemoveTrack, isHost }:
         </div>
       </div>
       
-      <ScrollArea className="flex-1 p-3">
+      <div className="flex-1 overflow-y-auto p-3 min-h-0">
         {playlist.length === 0 ? (
           <div className="h-full flex flex-col items-center justify-center text-center text-muted-foreground/60 space-y-4 py-16">
             <div className="w-12 h-12 rounded-full bg-primary/5 flex items-center justify-center">
@@ -67,29 +66,30 @@ export function PlaylistPanel({ playlist, currentTrack, onRemoveTrack, isHost }:
                     )}
                   </div>
                   
-                  <div className="flex-1 min-w-0 pr-8">
+                  <div className="flex-1 min-w-0">
                     <h4 className={`text-sm font-semibold truncate ${isPlaying ? 'text-primary' : 'text-foreground'}`}>
                       {track.title}
                     </h4>
                     <p className="text-xs text-muted-foreground/70 truncate mt-0.5">{track.channelTitle}</p>
                   </div>
                   
-                  <div className="absolute right-3 opacity-0 group-hover:opacity-100 transition-opacity">
+                  {isHost && (
                     <Button 
                       variant="ghost" 
                       size="icon" 
-                      className="h-9 w-9 text-muted-foreground hover:text-red-500 hover:bg-red-50 rounded-xl"
+                      className="h-9 w-9 text-muted-foreground/40 hover:text-red-500 hover:bg-red-50 rounded-xl shrink-0 transition-all"
                       onClick={() => onRemoveTrack(i)}
+                      title="Xoá khỏi hàng đợi"
                     >
                       <Trash2 className="w-4 h-4" />
                     </Button>
-                  </div>
+                  )}
                 </div>
               );
             })}
           </div>
         )}
-      </ScrollArea>
+      </div>
     </div>
   );
 }

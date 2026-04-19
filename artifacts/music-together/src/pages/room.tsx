@@ -112,7 +112,7 @@ export default function Room() {
   }
 
   return (
-    <div className="min-h-screen w-full bg-background flex flex-col petal-bg font-sans">
+    <div className="h-screen overflow-hidden w-full bg-background flex flex-col petal-bg font-sans">
       {/* Header */}
       <header className="h-20 border-b border-primary/5 bg-white/40 backdrop-blur-md flex items-center justify-between px-8 shrink-0 z-20 sticky top-0">
         <div className="flex items-center gap-4">
@@ -160,13 +160,13 @@ export default function Room() {
       </header>
 
       {/* Main Content */}
-      <main className="flex-1 overflow-hidden flex flex-col lg:flex-row p-6 gap-6 z-10 relative">
+      <main className="flex-1 overflow-hidden flex flex-col lg:flex-row p-6 gap-6 z-10 relative min-h-0">
         {/* Background decorations */}
         <div className="absolute top-0 right-0 w-[40%] h-[40%] bg-primary/5 rounded-full blur-[120px] pointer-events-none -z-10"></div>
         <div className="absolute bottom-0 left-0 w-[30%] h-[30%] bg-secondary/5 rounded-full blur-[100px] pointer-events-none -z-10"></div>
         
         {/* Left Column: Player & Controls */}
-        <div className="flex-1 flex flex-col gap-6 min-w-0 max-w-5xl mx-auto w-full">
+        <div className="flex-1 flex flex-col gap-6 min-w-0 max-w-5xl mx-auto w-full overflow-y-auto min-h-0">
           <div className="w-full">
             <YoutubePlayer 
               currentTrack={roomState?.currentTrack || null}
@@ -202,7 +202,7 @@ export default function Room() {
         </div>
 
         {/* Right Column: Chat */}
-        <div className="w-full lg:w-[380px] xl:w-[420px] h-[500px] lg:h-auto shrink-0 flex flex-col">
+        <div className="w-full lg:w-[380px] xl:w-[420px] h-[500px] lg:h-auto shrink-0 flex flex-col min-h-0">
           <ChatPanel 
             messages={roomState?.chatHistory || []}
             onSendMessage={handleSendMessage}

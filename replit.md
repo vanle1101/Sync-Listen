@@ -39,6 +39,8 @@ A collaborative music listening web app — create or join rooms to listen to Yo
 
 **YouTube API:** Set `YOUTUBE_API_KEY` env var for real search results. Falls back to mock results if unset.
 
+**UI Design:** Vintage/cozy aesthetic — warm parchment (#f0e6d3), dusty rose primary, sage green secondary, Lora+Nunito fonts, custom cursor images. All scroll containers use plain `overflow-y: auto` divs (NOT Radix ScrollArea, which caused click interception issues). Room layout uses `h-screen overflow-hidden` root + scrollable left column (`overflow-y-auto min-h-0`).
+
 ## Key Commands
 
 - `pnpm run typecheck` — full typecheck across all packages

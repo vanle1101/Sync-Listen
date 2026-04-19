@@ -93,6 +93,8 @@ export function useWebSocket(roomId: string, userName: string | null) {
   const sendAction = useCallback((action: any) => {
     if (socket && socket.readyState === WebSocket.OPEN) {
       socket.send(JSON.stringify(action));
+    } else {
+      console.warn("[WS] sendAction dropped — socket not open, readyState:", socket?.readyState);
     }
   }, [socket]);
 

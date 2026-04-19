@@ -2,7 +2,6 @@ import { useEffect, useRef, useState } from "react";
 import { ChatMessage } from "@/lib/types";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { Send } from "lucide-react";
 
 interface ChatPanelProps {
@@ -17,10 +16,7 @@ export function ChatPanel({ messages, onSendMessage, currentUser }: ChatPanelPro
 
   useEffect(() => {
     if (scrollRef.current) {
-      const scrollContainer = scrollRef.current.querySelector('[data-radix-scroll-area-viewport]');
-      if (scrollContainer) {
-        scrollContainer.scrollTop = scrollContainer.scrollHeight;
-      }
+      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     }
   }, [messages]);
 
@@ -40,7 +36,7 @@ export function ChatPanel({ messages, onSendMessage, currentUser }: ChatPanelPro
         </h3>
       </div>
       
-      <ScrollArea ref={scrollRef} className="flex-1 p-5">
+      <div ref={scrollRef} className="flex-1 overflow-y-auto p-5 min-h-0">
         {messages.length === 0 ? (
           <div className="h-full flex flex-col items-center justify-center text-center text-muted-foreground/60 space-y-4 my-16">
             <div className="w-12 h-12 rounded-full bg-primary/5 flex items-center justify-center">
@@ -73,7 +69,7 @@ export function ChatPanel({ messages, onSendMessage, currentUser }: ChatPanelPro
             })}
           </div>
         )}
-      </ScrollArea>
+      </div>
       
       <div className="p-4 border-t border-primary/5 bg-white/60">
         <form onSubmit={handleSubmit} className="flex gap-3">
