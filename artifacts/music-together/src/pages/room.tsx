@@ -9,7 +9,7 @@ import { PlayerControls } from "@/components/player-controls";
 import { RightPanel } from "@/components/right-panel";
 import {
   Music, Loader2, Copy, LogOut, Minimize2, Share2, CreditCard,
-  Palette, Coffee, UserCheck, Settings, Globe, Users, X, Download, Check, Heart, ImagePlus
+  Palette, Coffee, UserCheck, Settings, Globe, Users, X, Download, Check, Heart, ImagePlus, Power, Lock, Eye, EyeOff
 } from "lucide-react";
 import { useGetRoom, getGetRoomQueryKey } from "@workspace/api-client-react";
 
@@ -310,39 +310,150 @@ function ThemeModal({
 }
 
 /* ──────────────── Settings Modal ──────────────── */
-function SettingsModal({ roomId, hostName, listeners, onClose }: { roomId: string; hostName: string; listeners: string[]; onClose: () => void }) {
+function SettingsModal({
+  roomId, hostName, listeners, isHost,
+  themeId, onSelectTheme,
+  onClose,
+}: {
+  roomId: string; hostName: string; listeners: string[];
+  isHost: boolean; themeId: string; onSelectTheme: (id: string) => void;
+  onClose: () => void;
+}) {
+  const [, setLocation] = useLocation();
+  const { toast } = useToast();
+  const [roomName, setRoomName] = useState(hostName);
+  const [isPublic, setIsPublic] = useState(true);
+  const [password, setPassword] = useState("");
+  const [showPass, setShowPass] = useState(false);
+  const [localTheme, setLocalTheme] = useState(themeId);
+  const [closeConfirm, setCloseConfirm] = useState(false);
+
+  const handleSave = () => {
+    onSelectTheme(localTheme);
+    toast({ title: "Đã lưu cài đặt" });
+    onClose();
+  };
+
+  const handleCloseRoom = () => {
+    if (!closeConfirm) { setCloseConfirm(true); return; }
+    toast({ title: "Phòng đã đóng", description: "Tạm biệt nhé!" });
+    setLocation("/");
+  };
+
+  const SectionLabel = ({ children }: { children: React.ReactNode }) => (
+    <p className="text-[10px] font-bold tracking-widest text-muted-foreground/60 mb-2">{children}</p>
+  );
+
   return (
-    <ModalBase title="Cài đặt phòng" onClose={onClose}>
-      <div className="space-y-3">
-        <InfoRow label="Mã phòng" value={roomId} mono />
-        <InfoRow label="Chủ phòng" value={hostName} />
-        <InfoRow label="Thành viên" value={`${listeners.length} người`} />
+    <ModalBase title="Cài đặt phòng" onClose={onClose} scrollable>
+      <div className="space-y-5">
+        {/* Room name */}
+        <div>
+          <SectionLabel>TÊN PHÒNG</SectionLabel>
+          <input
+            value={roomName}
+            onChange={e => setRoomName(e.target.value)}
+            disabled={!isHost}
+            className="w-full px-4 py-3 rounded-2xl border border-border/60 bg-background/60 text-sm text-foreground focus:outline-none focus:border-primary/50 disabled:opacity-60 disabled:cursor-not-allowed"
+            placeholder="Tên phòng..."
+          />
+        </div>
+
+        {/* Public toggle */}
+        <div className="flex items-center gap-4 px-4 py-3.5 rounded-2xl border border-border/60 bg-background/40">
+          <Globe className="w-5 h-5 text-muted-foreground/60 shrink-0" />
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-medium text-foreground">Phòng công khai</p>
+            <p className="text-xs text-muted-foreground/60">Chỉ có link mới vào được</p>
+          </div>
+          <button
+            onClick={() => isHost && setIsPublic(p => !p)}
+            disabled={!isHost}
+            className={`relative w-11 h-6 rounded-full transition-colors shrink-0 ${isPublic ? 'bg-primary' : 'bg-border'} disabled:opacity-50`}>
+            <span className={`absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white shadow-sm transition-transform ${isPublic ? 'translate-x-5' : 'translate-x-0'}`} />
+          </button>
+        </div>
+
+        {/* Password */}
+        <div>
+          <SectionLabel>MẬT KHẨU PHÒNG <span className="normal-case font-normal opacity-60">(tùy chọn)</span></SectionLabel>
+          <div className="relative">
+            <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground/40" />
+            <input
+              type={showPass ? "text" : "password"}
+              value={password}
+              onChange={e => setPassword(e.target.value)}
+              disabled={!isHost}
+              placeholder={isHost ? "••••• (nhập để đặt, bỏ trống để xóa)" : "•••••"}
+              className="w-full pl-10 pr-10 py-3 rounded-2xl border border-border/60 bg-background/60 text-sm text-foreground focus:outline-none focus:border-primary/50 disabled:opacity-60 disabled:cursor-not-allowed"
+            />
+            <button onClick={() => setShowPass(s => !s)}
+              className="absolute right-3 top-1/2 -translate-y-1/2 w-7 h-7 flex items-center justify-center text-muted-foreground/40 hover:text-primary transition-colors">
+              {showPass ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+            </button>
+          </div>
+        </div>
+
+        {/* Theme picker */}
+        <div>
+          <SectionLabel>GIAO DIỆN PHÒNG</SectionLabel>
+          <div className="grid grid-cols-4 gap-2">
+            {THEMES.map(t => (
+              <button key={t.id}
+                onClick={() => setLocalTheme(t.id)}
+                className={`flex flex-col items-center gap-1.5 py-3 px-1 rounded-2xl border-2 transition-all hover:scale-105 active:scale-95
+                  ${localTheme === t.id ? 'border-primary shadow-md bg-primary/5' : 'border-border/50 hover:border-primary/40 bg-white/60'}`}>
+                <span className="text-2xl leading-none">{t.emoji}</span>
+                <span className="text-[11px] font-medium text-foreground/70">{t.name}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Save button */}
+        <button onClick={handleSave}
+          className="w-full py-3.5 bg-primary text-white rounded-2xl font-semibold text-sm hover:bg-primary/90 transition-colors">
+          Lưu thay đổi
+        </button>
+
+        {/* Close room — host only */}
+        {isHost && (
+          <button onClick={handleCloseRoom}
+            className={`w-full py-3.5 rounded-2xl font-semibold text-sm border-2 transition-all flex items-center justify-center gap-2
+              ${closeConfirm
+                ? 'bg-red-500 text-white border-red-500 hover:bg-red-600'
+                : 'text-red-500 border-red-200 hover:bg-red-50'}`}>
+            <Power className="w-4 h-4" />
+            {closeConfirm ? "Xác nhận đóng phòng?" : "Đóng phòng vĩnh viễn"}
+          </button>
+        )}
+
+        {/* Room info footer */}
+        <div className="text-center text-xs text-muted-foreground/40 pt-1">
+          Mã phòng: <span className="font-mono font-bold tracking-wider">{roomId}</span>
+          {" · "}{listeners.length} người nghe
+        </div>
       </div>
     </ModalBase>
   );
 }
 
-function InfoRow({ label, value, mono = false }: { label: string; value: string; mono?: boolean }) {
-  return (
-    <div className="flex items-center justify-between p-3 bg-primary/5 rounded-2xl">
-      <span className="text-sm text-muted-foreground">{label}</span>
-      <span className={`text-sm font-semibold text-foreground ${mono ? 'font-mono tracking-wider' : ''}`}>{value}</span>
-    </div>
-  );
-}
-
 /* ──────────────── Modal Base ──────────────── */
-function ModalBase({ title, children, onClose }: { title: string; children: React.ReactNode; onClose: () => void }) {
+function ModalBase({ title, children, onClose, scrollable = false }: {
+  title: string; children: React.ReactNode; onClose: () => void; scrollable?: boolean;
+}) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/30 backdrop-blur-sm animate-in fade-in duration-200">
-      <div className="bg-white/95 rounded-3xl shadow-2xl w-full max-w-md p-6 relative animate-in zoom-in-95 duration-200">
-        <div className="flex items-center justify-between mb-5">
+      <div className={`bg-white/95 rounded-3xl shadow-2xl w-full max-w-md relative animate-in zoom-in-95 duration-200 flex flex-col ${scrollable ? 'max-h-[90vh]' : ''}`}>
+        <div className="flex items-center justify-between px-6 pt-6 pb-5 shrink-0">
           <h2 className="text-lg font-serif italic font-semibold text-foreground">{title}</h2>
           <button onClick={onClose} className="w-8 h-8 rounded-xl hover:bg-primary/10 flex items-center justify-center text-muted-foreground transition-colors">
             <X className="w-4 h-4" />
           </button>
         </div>
-        {children}
+        <div className={`px-6 pb-6 ${scrollable ? 'overflow-y-auto min-h-0' : ''}`}>
+          {children}
+        </div>
       </div>
     </div>
   );
@@ -705,7 +816,7 @@ export default function Room() {
       {shareOpen    && <ShareModal    roomId={roomId} onClose={() => setShareOpen(false)} />}
       {postcardOpen && <PostcardModal roomId={roomId} hostName={roomState?.hostName ?? ""} currentTrack={roomState?.currentTrack ?? null} listeners={roomState?.listeners ?? []} onClose={() => setPostcardOpen(false)} />}
       {themeOpen    && <ThemeModal    currentTheme={themeId} onSelect={setThemeId} bgImageUrl={bgImageUrl} onSetBgImage={handleSetBgImage} onClose={() => setThemeOpen(false)} />}
-      {settingsOpen && <SettingsModal roomId={roomId} hostName={roomState?.hostName ?? ""} listeners={roomState?.listeners ?? []} onClose={() => setSettingsOpen(false)} />}
+      {settingsOpen && <SettingsModal roomId={roomId} hostName={roomState?.hostName ?? ""} listeners={roomState?.listeners ?? []} isHost={isHost} themeId={themeId} onSelectTheme={setThemeId} onClose={() => setSettingsOpen(false)} />}
       {donateOpen   && <DonateModal   onClose={() => setDonateOpen(false)} />}
     </div>
   );
