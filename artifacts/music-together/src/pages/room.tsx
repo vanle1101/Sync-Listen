@@ -112,58 +112,61 @@ export default function Room() {
   }
 
   return (
-    <div className="min-h-screen w-full bg-background flex flex-col">
+    <div className="min-h-screen w-full bg-background flex flex-col petal-bg font-sans">
       {/* Header */}
-      <header className="h-16 border-b border-white/5 bg-black/20 flex items-center justify-between px-6 shrink-0 z-10 relative">
-        <div className="flex items-center gap-3">
-          <div className="w-8 h-8 rounded bg-primary/20 flex items-center justify-center border border-primary/30 neon-glow">
-            <Music className="w-4 h-4 text-primary" />
+      <header className="h-20 border-b border-primary/5 bg-white/40 backdrop-blur-md flex items-center justify-between px-8 shrink-0 z-20 sticky top-0">
+        <div className="flex items-center gap-4">
+          <div className="w-10 h-10 rounded-2xl bg-primary/10 flex items-center justify-center border border-primary/20 soft-glow">
+            <Music className="w-5 h-5 text-primary" />
           </div>
-          <h1 className="font-bold text-lg tracking-tight hidden sm:block">Music Together</h1>
-          <div className="h-4 w-px bg-white/10 mx-2 hidden sm:block"></div>
-          <div className="flex items-center gap-2 text-sm text-muted-foreground bg-white/5 px-3 py-1 rounded-full border border-white/5">
-            <span className={`w-2 h-2 rounded-full ${connected ? 'bg-green-500 animate-pulse' : 'bg-red-500'}`}></span>
-            {connected ? 'Live' : 'Reconnecting...'}
+          <h1 className="font-serif text-2xl tracking-tight hidden sm:block italic font-medium text-foreground">Music Together</h1>
+          <div className="h-6 w-px bg-primary/10 mx-2 hidden sm:block"></div>
+          <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground bg-primary/5 px-4 py-1.5 rounded-full border border-primary/10">
+            <span className={`w-2 h-2 rounded-full ${connected ? 'bg-primary animate-pulse' : 'bg-red-400'}`}></span>
+            {connected ? 'Đang phát trực tiếp' : 'Đang kết nối lại...'}
           </div>
         </div>
 
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-6">
           {roomState && (
-            <div className="flex -space-x-2 mr-2">
-              {roomState.listeners.slice(0, 3).map((listener, i) => (
-                <div key={i} className="w-8 h-8 rounded-full bg-secondary border border-background flex items-center justify-center text-xs font-medium text-foreground relative group" title={listener}>
+            <div className="flex -space-x-3 mr-2">
+              {roomState.listeners.slice(0, 4).map((listener, i) => (
+                <div key={i} className="w-10 h-10 rounded-full bg-card border-2 border-white flex items-center justify-center text-xs font-semibold text-primary shadow-sm relative group transition-transform hover:-translate-y-1" title={listener}>
                   {listener.charAt(0).toUpperCase()}
                   {listener === roomState.hostName && (
-                    <span className="absolute -top-1 -right-1 w-3 h-3 bg-accent rounded-full border border-background"></span>
+                    <span className="absolute -top-1 -right-1 w-4 h-4 bg-primary rounded-full border-2 border-white flex items-center justify-center">
+                      <div className="w-1.5 h-1.5 bg-white rounded-full"></div>
+                    </span>
                   )}
                 </div>
               ))}
-              {roomState.listeners.length > 3 && (
-                <div className="w-8 h-8 rounded-full bg-white/10 border border-background flex items-center justify-center text-xs font-medium">
-                  +{roomState.listeners.length - 3}
+              {roomState.listeners.length > 4 && (
+                <div className="w-10 h-10 rounded-full bg-muted border-2 border-white flex items-center justify-center text-xs font-bold text-muted-foreground shadow-sm">
+                  +{roomState.listeners.length - 4}
                 </div>
               )}
             </div>
           )}
           
-          <Button variant="outline" size="sm" className="hidden sm:flex gap-2 border-white/10 bg-white/5 hover:bg-white/10 text-foreground" onClick={handleCopyLink}>
-            <Copy className="w-4 h-4 text-muted-foreground" />
-            Copy Link
+          <Button variant="ghost" size="sm" className="hidden sm:flex gap-2 text-primary hover:bg-primary/5 font-medium rounded-xl" onClick={handleCopyLink}>
+            <Copy className="w-4 h-4" />
+            Sao chép link
           </Button>
           
-          <Button variant="ghost" size="icon" className="text-muted-foreground hover:text-white" onClick={handleLeave}>
+          <Button variant="ghost" size="icon" className="text-muted-foreground hover:text-primary hover:bg-primary/5 rounded-xl" onClick={handleLeave}>
             <LogOut className="w-5 h-5" />
           </Button>
         </div>
       </header>
 
       {/* Main Content */}
-      <main className="flex-1 overflow-hidden flex flex-col lg:flex-row p-4 gap-4 z-10 relative">
+      <main className="flex-1 overflow-hidden flex flex-col lg:flex-row p-6 gap-6 z-10 relative">
         {/* Background decorations */}
-        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full max-w-4xl h-[500px] bg-primary/10 rounded-full blur-[150px] pointer-events-none -z-10"></div>
+        <div className="absolute top-0 right-0 w-[40%] h-[40%] bg-primary/5 rounded-full blur-[120px] pointer-events-none -z-10"></div>
+        <div className="absolute bottom-0 left-0 w-[30%] h-[30%] bg-secondary/5 rounded-full blur-[100px] pointer-events-none -z-10"></div>
         
         {/* Left Column: Player & Controls */}
-        <div className="flex-1 flex flex-col gap-4 min-w-0 max-w-4xl mx-auto w-full">
+        <div className="flex-1 flex flex-col gap-6 min-w-0 max-w-5xl mx-auto w-full">
           <div className="w-full">
             <YoutubePlayer 
               currentTrack={roomState?.currentTrack || null}
@@ -183,8 +186,8 @@ export default function Room() {
             />
           </div>
           
-          <div className="flex-1 min-h-[300px] flex flex-col md:flex-row gap-4">
-            <div className="flex-1 min-h-[300px] h-full">
+          <div className="flex-1 min-h-[400px] flex flex-col md:flex-row gap-6">
+            <div className="flex-1 min-h-[400px] h-full">
               <PlaylistPanel 
                 playlist={roomState?.playlist || []}
                 currentTrack={roomState?.currentTrack || null}
@@ -192,14 +195,14 @@ export default function Room() {
                 isHost={isHost}
               />
             </div>
-            <div className="flex-1 min-h-[300px] h-full">
+            <div className="flex-1 min-h-[400px] h-full">
               <SearchPanel onAddTrack={handleAddTrack} />
             </div>
           </div>
         </div>
 
         {/* Right Column: Chat */}
-        <div className="w-full lg:w-[350px] xl:w-[400px] h-[400px] lg:h-auto shrink-0 flex flex-col">
+        <div className="w-full lg:w-[380px] xl:w-[420px] h-[500px] lg:h-auto shrink-0 flex flex-col">
           <ChatPanel 
             messages={roomState?.chatHistory || []}
             onSendMessage={handleSendMessage}

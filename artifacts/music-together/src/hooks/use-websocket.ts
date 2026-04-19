@@ -42,7 +42,9 @@ export function useWebSocket(roomId: string, userName: string | null) {
               ...prev,
               playing: msg.playing,
               currentTime: msg.currentTime,
-              currentTrack: msg.videoId ? (prev.playlist.find(t => t.videoId === msg.videoId) || prev.currentTrack) : null
+              currentTrack: msg.currentTrack !== undefined
+                ? msg.currentTrack
+                : (msg.videoId ? (prev.currentTrack?.videoId === msg.videoId ? prev.currentTrack : prev.playlist.find((t: any) => t.videoId === msg.videoId) || prev.currentTrack) : null)
             } : null);
             break;
             

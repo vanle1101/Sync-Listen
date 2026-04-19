@@ -19,7 +19,7 @@ router.post("/rooms", async (req, res): Promise<void> => {
     .values({ id, hostName: parsed.data.hostName })
     .returning();
 
-  res.status(201).json(GetRoomResponse.parse(room));
+  res.status(201).json(GetRoomResponse.parse({ ...room, createdAt: room.createdAt.toISOString() }));
 });
 
 router.get("/rooms/:roomId", async (req, res): Promise<void> => {
@@ -40,7 +40,7 @@ router.get("/rooms/:roomId", async (req, res): Promise<void> => {
     return;
   }
 
-  res.json(GetRoomResponse.parse(room));
+  res.json(GetRoomResponse.parse({ ...room, createdAt: room.createdAt.toISOString() }));
 });
 
 export default router;

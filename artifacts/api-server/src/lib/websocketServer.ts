@@ -101,6 +101,7 @@ export function setupWebSocketServer(server: http.Server): void {
               playing: room.playing,
               currentTime: room.currentTime,
               videoId: room.currentTrack.videoId,
+              currentTrack: room.currentTrack,
             });
           }
           break;
@@ -126,6 +127,7 @@ export function setupWebSocketServer(server: http.Server): void {
             playing: room.playing,
             currentTime: room.currentTime,
             videoId: room.currentTrack?.videoId ?? null,
+            currentTrack: room.currentTrack ?? null,
           });
           break;
         }
@@ -147,6 +149,7 @@ export function setupWebSocketServer(server: http.Server): void {
             playing: false,
             currentTime: 0,
             videoId: room.currentTrack?.videoId ?? null,
+            currentTrack: room.currentTrack ?? null,
           });
           broadcast(currentRoomId, { type: "playlist_update", playlist: room.playlist });
           break;
@@ -162,6 +165,7 @@ export function setupWebSocketServer(server: http.Server): void {
               playing: room.playing,
               currentTime: room.currentTime,
               videoId: room.currentTrack?.videoId ?? null,
+              currentTrack: room.currentTrack ?? null,
             },
             ws,
           );

@@ -32,34 +32,40 @@ export function ChatPanel({ messages, onSendMessage, currentUser }: ChatPanelPro
   };
 
   return (
-    <div className="flex flex-col h-full bg-card/40 border border-white/5 rounded-xl overflow-hidden glass-panel">
-      <div className="p-4 border-b border-white/5 bg-black/20">
-        <h3 className="font-mono text-sm tracking-wider uppercase flex items-center gap-2">
+    <div className="flex flex-col h-full bloom-card overflow-hidden border-none">
+      <div className="p-5 border-b border-primary/5 bg-white/60">
+        <h3 className="text-base font-medium text-foreground flex items-center gap-2">
           <span className="w-2 h-2 rounded-full bg-primary animate-pulse"></span>
-          Room Chat
+          Chat
         </h3>
       </div>
       
-      <ScrollArea ref={scrollRef} className="flex-1 p-4">
+      <ScrollArea ref={scrollRef} className="flex-1 p-5">
         {messages.length === 0 ? (
-          <div className="h-full flex flex-col items-center justify-center text-center text-muted-foreground space-y-3 opacity-50 my-12">
-            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z"></path></svg>
-            <p className="text-sm">Say hi to everyone!</p>
+          <div className="h-full flex flex-col items-center justify-center text-center text-muted-foreground/60 space-y-4 my-16">
+            <div className="w-12 h-12 rounded-full bg-primary/5 flex items-center justify-center">
+              <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="text-primary/40"><path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z"></path></svg>
+            </div>
+            <p className="text-sm font-medium">Nói chào mọi người nhé!</p>
           </div>
         ) : (
-          <div className="space-y-4">
+          <div className="space-y-6">
             {messages.map((msg, i) => {
               const isMe = msg.userName === currentUser;
               const date = new Date(msg.timestamp);
               const timeStr = isNaN(date.getTime()) ? "" : date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
               
               return (
-                <div key={i} className={`flex flex-col ${isMe ? 'items-end' : 'items-start'} animate-in fade-in slide-in-from-bottom-2 duration-300`}>
-                  <div className="flex items-baseline gap-2 mb-1">
-                    <span className="text-xs font-medium text-white/70">{msg.userName}</span>
-                    <span className="text-[10px] text-muted-foreground">{timeStr}</span>
+                <div key={i} className={`flex flex-col ${isMe ? 'items-end' : 'items-start'} animate-in fade-in slide-in-from-bottom-3 duration-500`}>
+                  <div className="flex items-baseline gap-2 mb-1.5 px-1">
+                    <span className="text-xs font-semibold text-foreground/70">{msg.userName}</span>
+                    <span className="text-[10px] text-muted-foreground/50">{timeStr}</span>
                   </div>
-                  <div className={`px-4 py-2 rounded-2xl max-w-[85%] break-words ${isMe ? 'bg-primary text-primary-foreground rounded-tr-sm' : 'bg-white/10 text-foreground rounded-tl-sm'}`}>
+                  <div className={`px-5 py-2.5 rounded-3xl max-w-[90%] break-words text-sm shadow-sm transition-all hover:shadow-md ${
+                    isMe 
+                      ? 'bg-gradient-to-br from-primary to-[#ff7eb3] text-white rounded-tr-none' 
+                      : 'bg-white border border-primary/5 text-foreground rounded-tl-none'
+                  }`}>
                     {msg.text}
                   </div>
                 </div>
@@ -69,16 +75,16 @@ export function ChatPanel({ messages, onSendMessage, currentUser }: ChatPanelPro
         )}
       </ScrollArea>
       
-      <div className="p-3 border-t border-white/5 bg-black/20">
-        <form onSubmit={handleSubmit} className="flex gap-2">
+      <div className="p-4 border-t border-primary/5 bg-white/60">
+        <form onSubmit={handleSubmit} className="flex gap-3">
           <Input 
             value={text} 
             onChange={(e) => setText(e.target.value)} 
-            placeholder="Type a message..." 
-            className="bg-black/40 border-white/10 focus-visible:ring-primary h-10 rounded-full px-4"
+            placeholder="Gửi tin nhắn..." 
+            className="bg-white border-primary/10 focus-visible:ring-primary/20 h-12 rounded-2xl px-5 shadow-sm"
           />
-          <Button type="submit" size="icon" disabled={!text.trim()} className="rounded-full w-10 h-10 bg-primary hover:bg-primary/90 text-primary-foreground shrink-0">
-            <Send className="w-4 h-4" />
+          <Button type="submit" size="icon" disabled={!text.trim()} className="rounded-2xl w-12 h-12 bg-primary hover:bg-primary/90 text-white shadow-lg shadow-primary/20 shrink-0 transition-transform hover:scale-105 active:scale-95">
+            <Send className="w-5 h-5" />
           </Button>
         </form>
       </div>

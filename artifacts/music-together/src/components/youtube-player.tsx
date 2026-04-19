@@ -159,18 +159,18 @@ export function YoutubePlayer({
   }, [isHost, isReady, onStateChange]);
 
   return (
-    <div className="relative w-full pt-[56.25%] bg-black/50 rounded-xl overflow-hidden border border-white/5 group shadow-2xl">
+    <div className="relative w-full pt-[56.25%] bg-white rounded-[2rem] overflow-hidden border border-primary/10 group shadow-2xl soft-glow">
       {/* YT player is pushed back and pointer events disabled to prevent direct interaction, we use custom controls */}
-      <div className="absolute inset-0 z-0 pointer-events-none opacity-80 group-hover:opacity-100 transition-opacity duration-500">
-        <div ref={containerRef} id="youtube-player" className="w-full h-full scale-[1.2]"></div>
+      <div className="absolute inset-0 z-0 pointer-events-none opacity-90 group-hover:opacity-100 transition-opacity duration-700">
+        <div ref={containerRef} id="youtube-player" className="w-full h-full scale-[1.1]"></div>
       </div>
       
       {!currentTrack && (
-        <div className="absolute inset-0 z-10 flex flex-col items-center justify-center text-muted-foreground">
-          <div className="w-16 h-16 rounded-full bg-white/5 flex items-center justify-center mb-4 neon-glow">
-            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-primary"><path d="M9 18V5l12-2v13"></path><circle cx="6" cy="18" r="3"></circle><circle cx="18" cy="16" r="3"></circle></svg>
+        <div className="absolute inset-0 z-10 flex flex-col items-center justify-center text-primary/40">
+          <div className="w-20 h-20 rounded-full bg-primary/5 flex items-center justify-center mb-6 soft-glow">
+            <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="text-primary"><path d="M9 18V5l12-2v13"></path><circle cx="6" cy="18" r="3"></circle><circle cx="18" cy="16" r="3"></circle></svg>
           </div>
-          <p className="font-mono text-sm tracking-widest uppercase">No Track Playing</p>
+          <p className="text-lg font-serif italic font-medium tracking-wide">Chưa có bài hát đang phát</p>
         </div>
       )}
       
@@ -179,14 +179,14 @@ export function YoutubePlayer({
       
       {/* Current track info overlay */}
       {currentTrack && (
-        <div className="absolute bottom-0 left-0 right-0 p-6 z-30 bg-gradient-to-t from-background/90 via-background/60 to-transparent pointer-events-none">
-          <div className="flex items-end gap-4">
+        <div className="absolute bottom-0 left-0 right-0 p-8 z-30 bg-gradient-to-t from-white/95 via-white/60 to-transparent pointer-events-none backdrop-blur-[2px]">
+          <div className="flex items-end gap-6">
             {currentTrack.thumbnail && (
-              <img src={currentTrack.thumbnail} alt={currentTrack.title} className="w-16 h-16 rounded shadow-md object-cover border border-white/10" />
+              <img src={currentTrack.thumbnail} alt={currentTrack.title} className="w-20 h-20 rounded-2xl shadow-lg object-cover border-2 border-white transform transition-transform group-hover:scale-105" />
             )}
-            <div className="flex-1 min-w-0">
-              <h2 className="text-xl font-bold text-white truncate drop-shadow-md">{currentTrack.title}</h2>
-              <p className="text-muted-foreground truncate">{currentTrack.channelTitle}</p>
+            <div className="flex-1 min-w-0 pb-1">
+              <h2 className="text-2xl font-serif italic font-semibold text-foreground truncate drop-shadow-sm">{currentTrack.title}</h2>
+              <p className="text-primary/70 font-medium truncate mt-1">{currentTrack.channelTitle}</p>
             </div>
           </div>
         </div>

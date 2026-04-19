@@ -38,56 +38,58 @@ export function SearchPanel({ onAddTrack }: SearchPanelProps) {
   };
 
   return (
-    <div className="flex flex-col h-full bg-card/40 border border-white/5 rounded-xl overflow-hidden glass-panel">
-      <div className="p-4 border-b border-white/5 bg-black/20">
+    <div className="flex flex-col h-full bloom-card overflow-hidden border-none">
+      <div className="p-5 border-b border-primary/5 bg-white/60">
         <form onSubmit={handleSearch} className="relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+          <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-primary/40" />
           <Input 
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Search YouTube..." 
-            className="pl-9 bg-black/40 border-white/10 h-10 rounded-full"
+            placeholder="Tìm kiếm bài hát..." 
+            className="pl-11 bg-white border-primary/10 h-12 rounded-2xl shadow-sm focus-visible:ring-primary/20"
           />
         </form>
       </div>
       
-      <ScrollArea className="flex-1 p-2">
+      <ScrollArea className="flex-1 p-3">
         {isLoading ? (
-          <div className="h-full flex items-center justify-center p-8">
-            <Loader2 className="w-6 h-6 animate-spin text-primary" />
+          <div className="h-full flex items-center justify-center p-12">
+            <Loader2 className="w-8 h-8 animate-spin text-primary/60" />
           </div>
         ) : results && results.length > 0 ? (
           <div className="space-y-2">
             {results.map((video) => (
-              <div key={video.videoId} className="group flex items-center gap-3 p-2 rounded-lg hover:bg-white/5 border border-transparent transition-colors">
-                <div className="relative w-16 h-12 rounded overflow-hidden flex-shrink-0 bg-black/50">
+              <div key={video.videoId} className="group flex items-center gap-4 p-3 rounded-2xl hover:bg-white border border-transparent transition-all duration-300 hover:shadow-md">
+                <div className="relative w-20 h-14 rounded-xl overflow-hidden flex-shrink-0 bg-muted shadow-sm">
                   <img src={video.thumbnail} alt="" className="w-full h-full object-cover" />
                 </div>
                 
                 <div className="flex-1 min-w-0 pr-8">
-                  <h4 className="text-sm font-medium text-foreground truncate">{video.title}</h4>
-                  <p className="text-xs text-muted-foreground truncate">{video.channelTitle}</p>
+                  <h4 className="text-sm font-semibold text-foreground truncate">{video.title}</h4>
+                  <p className="text-xs text-muted-foreground/70 truncate mt-0.5">{video.channelTitle}</p>
                 </div>
                 
                 <Button 
                   size="icon" 
                   variant="ghost"
-                  className="h-8 w-8 rounded-full opacity-0 group-hover:opacity-100 transition-opacity text-primary hover:text-primary-foreground hover:bg-primary shrink-0"
+                  className="h-10 w-10 rounded-2xl opacity-0 group-hover:opacity-100 transition-all text-primary hover:text-white hover:bg-primary shadow-sm active:scale-95 shrink-0"
                   onClick={() => handleAdd(video)}
                 >
-                  <Plus className="w-4 h-4" />
+                  <Plus className="w-5 h-5" />
                 </Button>
               </div>
             ))}
           </div>
         ) : searchQuery ? (
-          <div className="text-center text-muted-foreground p-8 opacity-70">
-            <p className="text-sm">No results found for "{searchQuery}"</p>
+          <div className="text-center text-muted-foreground/60 p-12 italic">
+            <p className="text-sm">Không tìm thấy kết quả cho "{searchQuery}"</p>
           </div>
         ) : (
-          <div className="h-full flex flex-col items-center justify-center text-center text-muted-foreground space-y-3 opacity-40 py-12">
-            <Search className="w-8 h-8 mb-2" />
-            <p className="text-sm">Search for songs to add to the queue</p>
+          <div className="h-full flex flex-col items-center justify-center text-center text-muted-foreground/60 space-y-4 py-16">
+            <div className="w-12 h-12 rounded-full bg-primary/5 flex items-center justify-center">
+              <Search className="w-6 h-6 text-primary/40" />
+            </div>
+            <p className="text-sm font-medium">Tìm kiếm bài hát để thêm vào hàng đợi</p>
           </div>
         )}
       </ScrollArea>
