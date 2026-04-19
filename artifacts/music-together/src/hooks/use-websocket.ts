@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import { RoomState } from "../lib/types";
 
-export function useWebSocket(roomId: string, userName: string | null) {
+export function useWebSocket(roomId: string, userName: string | null, avatarUrl?: string | null) {
   const socketRef = useRef<WebSocket | null>(null);
   const [roomState, setRoomState] = useState<RoomState | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -11,9 +11,11 @@ export function useWebSocket(roomId: string, userName: string | null) {
   const mountedRef = useRef(true);
   const roomIdRef = useRef(roomId);
   const userNameRef = useRef(userName);
+  const avatarUrlRef = useRef(avatarUrl);
 
   roomIdRef.current = roomId;
   userNameRef.current = userName;
+  avatarUrlRef.current = avatarUrl;
 
   const sendAction = useCallback((action: any) => {
     const ws = socketRef.current;
@@ -41,7 +43,9 @@ export function useWebSocket(roomId: string, userName: string | null) {
         if (!mountedRef.current) { ws.close(); return; }
         setConnected(true);
         setError(null);
-        ws.send(JSON.stringify({ type: "join", roomId: roomIdRef.current, userName: userNameRef.current }));
+        const joinMsg: any = { type: "join", roomId: roomIdRef.current, userName: userNameRef.current };
+        if (avatarUrlRef.current) joinMsg.avatarUrl = avatarUrlRef.current;
+        ws.send(JSON.stringify(joinMsg));
 
         while (pendingActions.current.length > 0) {
           const action = pendingActions.current.shift();
@@ -91,7 +95,12 @@ export function useWebSocket(roomId: string, userName: string | null) {
               } : null);
               break;
             case "listeners_update":
-              setRoomState(prev => prev ? { ...prev, listeners: msg.listeners, hostName: msg.hostName } : null);
+              setRoomState(prev => prev ? {
+                ...prev,
+                listeners: msg.listeners,
+                hostName: msg.hostName,
+                userAvatars: msg.userAvatars ?? prev.userAvatars ?? {},
+              } : null);
               break;
             case "error":
               setError(msg.message);

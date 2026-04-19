@@ -29,6 +29,8 @@ interface RightPanelProps {
   chatMessages: ChatMessage[];
   isHost: boolean;
   currentUser: string;
+  myAvatarUrl?: string;
+  userAvatars?: Record<string, string>;
   onAddTrack: (t: Track) => void;
   onRemoveTrack: (i: number) => void;
   onPlayTrack: (i: number) => void;
@@ -38,6 +40,7 @@ interface RightPanelProps {
 
 export function RightPanel({
   playlist, playedTracks, currentTrack, chatMessages, isHost, currentUser,
+  myAvatarUrl, userAvatars,
   onAddTrack, onRemoveTrack, onPlayTrack, onSendMessage, activities,
 }: RightPanelProps) {
   const [tab, setTab] = useState<"playlist" | "chat" | "notif">("playlist");
@@ -88,7 +91,7 @@ export function RightPanel({
 
       {/* Tab content */}
       {tab === "playlist" && <PlaylistTab playlist={playlist} playedTracks={playedTracks} currentTrack={currentTrack} isHost={isHost} onAddTrack={onAddTrack} onRemoveTrack={onRemoveTrack} onPlayTrack={onPlayTrack} />}
-      {tab === "chat" && <ChatTab messages={chatMessages} currentUser={currentUser} onSendMessage={onSendMessage} />}
+      {tab === "chat" && <ChatTab messages={chatMessages} currentUser={currentUser} myAvatarUrl={myAvatarUrl} userAvatars={userAvatars} onSendMessage={onSendMessage} />}
       {tab === "notif" && <NotifTab activities={activities} soundOn={soundOn} onToggleSound={() => setSoundOn(s => !s)} />}
     </div>
   );
@@ -277,8 +280,29 @@ function PlaylistTab({ playlist, playedTracks, currentTrack, isHost, onAddTrack,
   );
 }
 
+/* ── Mini Avatar ──────────────────────────── */
+function MiniAvatar({ name, url }: { name: string; url?: string }) {
+  const initial = name.trim()[0]?.toUpperCase() || "?";
+  return (
+    <div className="w-7 h-7 rounded-full overflow-hidden flex-shrink-0 border border-primary/10 shadow-sm bg-gradient-to-br from-primary/10 to-secondary/20 flex items-center justify-center">
+      {url ? (
+        <img src={url} alt={name} className="w-full h-full object-cover"
+          onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }} />
+      ) : (
+        <span className="text-[10px] font-semibold text-primary/60">{initial}</span>
+      )}
+    </div>
+  );
+}
+
 /* ── Chat Tab ──────────────────────────────── */
-function ChatTab({ messages, currentUser, onSendMessage }: { messages: ChatMessage[]; currentUser: string; onSendMessage: (t: string) => void }) {
+function ChatTab({ messages, currentUser, myAvatarUrl, userAvatars, onSendMessage }: {
+  messages: ChatMessage[];
+  currentUser: string;
+  myAvatarUrl?: string;
+  userAvatars?: Record<string, string>;
+  onSendMessage: (t: string) => void;
+}) {
   const [text, setText] = useState("");
   const [emojiOpen, setEmojiOpen] = useState(false);
   const [imageOpen, setImageOpen] = useState(false);
@@ -338,19 +362,37 @@ function ChatTab({ messages, currentUser, onSendMessage }: { messages: ChatMessa
             <p className="text-sm font-medium">Nói chào mọi người nhé!</p>
           </div>
         ) : (
-          <div className="space-y-5">
+          <div className="space-y-3">
             {messages.map((msg, i) => {
               const isMe = msg.userName === currentUser;
               const date = new Date(msg.timestamp);
               const timeStr = isNaN(date.getTime()) ? "" : date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+              const avatarUrlForUser = isMe ? myAvatarUrl : (userAvatars?.[msg.userName]);
+              const prevMsg = messages[i - 1];
+              const showName = !prevMsg || prevMsg.userName !== msg.userName;
               return (
-                <div key={i} className={`flex flex-col ${isMe ? 'items-end' : 'items-start'} animate-in fade-in slide-in-from-bottom-2 duration-300`}>
-                  <div className="flex items-baseline gap-1.5 mb-1 px-1">
-                    <span className="text-[11px] font-semibold text-foreground/70">{msg.userName}</span>
-                    <span className="text-[9px] text-muted-foreground/40">{timeStr}</span>
+                <div key={i} className={`flex ${isMe ? 'flex-row-reverse' : 'flex-row'} items-end gap-2 animate-in fade-in slide-in-from-bottom-2 duration-300`}>
+                  {/* Avatar — only show for first in a run */}
+                  <div className="flex-shrink-0 self-end">
+                    {showName ? (
+                      <MiniAvatar name={msg.userName} url={avatarUrlForUser} />
+                    ) : (
+                      <div className="w-7" />
+                    )}
                   </div>
-                  <div className={`${isImageUrl(msg.text) ? 'p-1' : 'px-4 py-2'} rounded-3xl max-w-[85%] text-sm shadow-sm ${isMe ? 'bg-gradient-to-br from-primary to-[#d4a0ab] text-white rounded-tr-none' : 'bg-white border border-primary/5 text-foreground rounded-tl-none'}`}>
-                    <MessageContent text={msg.text} />
+                  <div className={`flex flex-col ${isMe ? 'items-end' : 'items-start'} max-w-[78%]`}>
+                    {showName && (
+                      <div className={`flex items-baseline gap-1.5 mb-1 px-1 ${isMe ? 'flex-row-reverse' : ''}`}>
+                        <span className="text-[11px] font-semibold text-foreground/70">{isMe ? "Bạn" : msg.userName}</span>
+                        <span className="text-[9px] text-muted-foreground/40">{timeStr}</span>
+                      </div>
+                    )}
+                    <div className={`${isImageUrl(msg.text) ? 'p-1' : 'px-4 py-2.5'} rounded-3xl text-sm shadow-sm ${isMe ? 'bg-gradient-to-br from-primary to-[#d4a0ab] text-white rounded-br-md' : 'bg-white border border-primary/5 text-foreground rounded-bl-md'}`}>
+                      <MessageContent text={msg.text} />
+                      {!showName && (
+                        <span className="ml-2 text-[8px] opacity-50">{timeStr}</span>
+                      )}
+                    </div>
                   </div>
                 </div>
               );

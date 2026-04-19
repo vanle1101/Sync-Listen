@@ -20,6 +20,7 @@ export interface RoomState {
   roomId: string;
   hostName: string;
   listeners: string[];
+  userAvatars: Record<string, string>;
   playlist: Track[];
   playedTracks: Track[];
   currentTrack: Track | null;
@@ -44,6 +45,7 @@ export function getOrCreateRoomState(roomId: string, hostName: string): RoomStat
       roomId,
       hostName,
       listeners: [],
+      userAvatars: {},
       playlist: [],
       playedTracks: [],
       currentTrack: null,

@@ -55,9 +55,14 @@ export function setupWebSocketServer(server: http.Server): void {
         currentRoomId = roomId;
         currentUserName = userName;
         const room = getOrCreateRoomState(roomId, userName);
+        // Store avatar URL (only https:// URLs for security, not base64)
+        const avatarUrl = msg.avatarUrl as string | undefined;
+        if (avatarUrl && typeof avatarUrl === 'string' && avatarUrl.startsWith('https://')) {
+          room.userAvatars[userName] = avatarUrl.substring(0, 512);
+        }
         addListener(roomId, ws, userName);
         sendToSocket(ws, { type: "room_state", room });
-        broadcast(roomId, { type: "listeners_update", listeners: room.listeners, hostName: room.hostName }, ws);
+        broadcast(roomId, { type: "listeners_update", listeners: room.listeners, hostName: room.hostName, userAvatars: room.userAvatars }, ws);
         logger.info({ roomId, userName }, "User joined room");
         return;
       }
@@ -240,7 +245,7 @@ export function setupWebSocketServer(server: http.Server): void {
       if (userName) {
         const room = getRoomState(currentRoomId);
         if (room) {
-          broadcast(currentRoomId, { type: "listeners_update", listeners: room.listeners, hostName: room.hostName });
+          broadcast(currentRoomId, { type: "listeners_update", listeners: room.listeners, hostName: room.hostName, userAvatars: room.userAvatars });
           logger.info({ roomId: currentRoomId, userName }, "User left room");
         }
       }

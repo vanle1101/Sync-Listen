@@ -18,6 +18,7 @@ export interface RoomState {
   roomId: string;
   hostName: string;
   listeners: string[];
+  userAvatars: Record<string, string>;
   playlist: Track[];
   playedTracks: Track[];
   currentTrack: Track | null;

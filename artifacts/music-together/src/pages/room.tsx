@@ -335,17 +335,21 @@ export default function Room() {
     setActivities(a => [...a, { text, time: nowTime() }]);
   }, []);
 
+  const [myAvatarUrl, setMyAvatarUrl] = useState<string>("");
+
   useEffect(() => {
     const name = sessionStorage.getItem("music-together-name");
     if (!name) { setLocation("/"); return; }
     setUserName(name);
+    const av = sessionStorage.getItem("music-together-avatar");
+    if (av) setMyAvatarUrl(av);
   }, [setLocation]);
 
   const { data: _roomInfo, isLoading: isLoadingRoom, error: roomError } = useGetRoom(roomId, {
     query: { enabled: !!roomId, queryKey: getGetRoomQueryKey(roomId) }
   });
 
-  const { roomState, connected, sendAction } = useWebSocket(roomId, userName);
+  const { roomState, connected, sendAction } = useWebSocket(roomId, userName, myAvatarUrl || null);
 
   const prevListenersRef = useRef<string[]>([]);
   useEffect(() => {
@@ -425,8 +429,12 @@ export default function Room() {
 
         {/* User info */}
         <div className="flex items-center gap-2 px-3 py-1.5 bg-white/60 rounded-xl border border-primary/10 text-xs shrink-0">
-          <div className="w-5 h-5 rounded-full bg-primary/20 flex items-center justify-center text-[10px] font-bold text-primary">
-            {userName.charAt(0).toUpperCase()}
+          <div className="w-5 h-5 rounded-full overflow-hidden bg-primary/20 flex items-center justify-center flex-shrink-0">
+            {myAvatarUrl ? (
+              <img src={myAvatarUrl} alt={userName} className="w-full h-full object-cover" />
+            ) : (
+              <span className="text-[10px] font-bold text-primary">{userName.charAt(0).toUpperCase()}</span>
+            )}
           </div>
           <span className="font-medium text-foreground/80 hidden sm:inline">{userName}</span>
           <span className="text-muted-foreground/50 hidden sm:inline">·</span>
@@ -551,6 +559,8 @@ export default function Room() {
             chatMessages={roomState?.chatHistory || []}
             isHost={isHost}
             currentUser={userName}
+            myAvatarUrl={myAvatarUrl || undefined}
+            userAvatars={roomState?.userAvatars}
             onAddTrack={handleAddTrack}
             onRemoveTrack={handleRemoveTrack}
             onPlayTrack={handlePlayTrack}
