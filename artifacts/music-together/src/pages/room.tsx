@@ -694,11 +694,13 @@ export default function Room() {
       setUserName(clerkName);
       if (user.imageUrl) setMyAvatarUrl(user.imageUrl);
     } else {
-      // Guest — read from sessionStorage
-      const name = sessionStorage.getItem("music-together-name");
+      // Guest — read from localStorage (persisted) or sessionStorage (fallback)
+      const name = localStorage.getItem("music-together-name")
+        ?? sessionStorage.getItem("music-together-name");
       if (!name) { setLocation("/"); return; }
       setUserName(name);
-      const av = sessionStorage.getItem("music-together-avatar");
+      const av = localStorage.getItem("music-together-avatar")
+        ?? sessionStorage.getItem("music-together-avatar");
       if (av) setMyAvatarUrl(av);
     }
   }, [clerkLoaded, user, setLocation]);
@@ -769,7 +771,7 @@ export default function Room() {
   };
   const handleTrackEnd = () => { if (effectiveIsHost) handleSkip(); };
   const handleSendMessage = (text: string) => sendAction({ type: "chat", text });
-  const handleLeave = () => { sessionStorage.removeItem("music-together-name"); setLocation("/"); };
+  const handleLeave = () => { setLocation("/"); };
 
   // Track unread messages in fullscreen chat bubble
   const chatMessages = roomState?.chatHistory || [];
