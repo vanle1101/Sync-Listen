@@ -16,13 +16,13 @@ import {
 import { useGetRoom, getGetRoomQueryKey } from "@workspace/api-client-react";
 
 /* ──────────────── helpers ──────────────── */
-function saveRecentRoom(roomId: string, hostName: string) {
+function saveRecentRoom(roomId: string, hostName: string, roomName?: string) {
   try {
     const key = "music-together-rooms";
     const raw = localStorage.getItem(key);
-    const rooms: { id: string; hostName: string; visitedAt: number }[] = raw ? JSON.parse(raw) : [];
+    const rooms: { id: string; hostName: string; roomName?: string; visitedAt: number }[] = raw ? JSON.parse(raw) : [];
     const filtered = rooms.filter(r => r.id !== roomId);
-    filtered.unshift({ id: roomId, hostName, visitedAt: Date.now() });
+    filtered.unshift({ id: roomId, hostName, roomName, visitedAt: Date.now() });
     localStorage.setItem(key, JSON.stringify(filtered.slice(0, 8)));
   } catch {}
 }
@@ -741,8 +741,8 @@ export default function Room() {
   }, [roomId, listenerCount]);
 
   useEffect(() => {
-    if (roomState?.hostName && roomId) saveRecentRoom(roomId, roomState.hostName);
-  }, [roomId, roomState?.hostName]);
+    if (roomState?.hostName && roomId) saveRecentRoom(roomId, roomState.hostName, roomState.roomName);
+  }, [roomId, roomState?.hostName, roomState?.roomName]);
 
   useEffect(() => {
     if (roomError) { toast({ title: "Phòng không tìm thấy", variant: "destructive" }); setLocation("/"); }

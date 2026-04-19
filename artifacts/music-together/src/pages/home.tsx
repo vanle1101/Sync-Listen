@@ -10,6 +10,7 @@ import { useUser, useClerk } from "@clerk/react";
 interface RecentRoom {
   id: string;
   hostName: string;
+  roomName?: string;
   visitedAt: number;
 }
 
@@ -206,7 +207,7 @@ export default function Home() {
                           <Music className="w-4 h-4 text-primary" />
                         </div>
                         <div className="min-w-0">
-                          <p className="text-sm font-medium text-foreground truncate">Phòng của {room.hostName}</p>
+                          <p className="text-sm font-medium text-foreground truncate">{room.roomName || `Phòng của ${room.hostName}`}</p>
                           <p className="text-xs text-muted-foreground/60">{timeAgo(room.visitedAt)}</p>
                         </div>
                       </div>
