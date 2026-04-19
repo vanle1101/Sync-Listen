@@ -1,8 +1,14 @@
 import { Router, type IRouter } from "express";
 import { db, roomsTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
-import { nanoid } from "nanoid";
 import { CreateRoomBody, GetRoomParams, GetRoomResponse } from "@workspace/api-zod";
+
+const CHARS = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+function genRoomId(): string {
+  let id = "";
+  for (let i = 0; i < 4; i++) id += CHARS[Math.floor(Math.random() * CHARS.length)];
+  return id;
+}
 
 const router: IRouter = Router();
 
@@ -13,7 +19,7 @@ router.post("/rooms", async (req, res): Promise<void> => {
     return;
   }
 
-  const id = nanoid(10);
+  const id = genRoomId();
   const [room] = await db
     .insert(roomsTable)
     .values({ id, hostName: parsed.data.hostName })
