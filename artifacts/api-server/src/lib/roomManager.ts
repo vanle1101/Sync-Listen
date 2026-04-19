@@ -19,6 +19,7 @@ export type RepeatMode = 'none' | 'one' | 'all';
 export interface RoomState {
   roomId: string;
   hostName: string;
+  roomName: string;
   listeners: string[];
   userAvatars: Record<string, string>;
   playlist: Track[];
@@ -40,11 +41,12 @@ interface ListenerInfo {
 const rooms = new Map<string, RoomState>();
 const roomListeners = new Map<string, ListenerInfo[]>();
 
-export function getOrCreateRoomState(roomId: string, hostName: string): RoomState {
+export function getOrCreateRoomState(roomId: string, hostName: string, roomName = ""): RoomState {
   if (!rooms.has(roomId)) {
     rooms.set(roomId, {
       roomId,
       hostName,
+      roomName,
       listeners: [],
       userAvatars: {},
       playlist: [],

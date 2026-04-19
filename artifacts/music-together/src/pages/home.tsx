@@ -79,6 +79,7 @@ export default function Home() {
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [joinRoomId, setJoinRoomId] = useState("");
+  const [newRoomName, setNewRoomName] = useState("");
   const [recentRooms, setRecentRooms] = useState<RecentRoom[]>([]);
   const createRoom = useCreateRoom();
 
@@ -139,8 +140,9 @@ export default function Home() {
   const handleCreateRoom = (e: React.FormEvent) => {
     e.preventDefault();
     const n = displayName.trim();
-    if (!n) return;
-    createRoom.mutate({ data: { hostName: n } }, {
+    const rn = newRoomName.trim();
+    if (!n || !rn) return;
+    createRoom.mutate({ data: { hostName: n, roomName: rn } }, {
       onSuccess: (room) => persistAndGo(`/room/${room.id}`),
     });
   };
@@ -336,12 +338,24 @@ export default function Home() {
                   <span className="bg-white/80 px-4 text-muted-foreground/60 font-medium tracking-widest uppercase">Tạo mới</span>
                 </div>
               </div>
-              <Button
-                onClick={handleCreateRoom}
-                disabled={!displayName.trim() || createRoom.isPending}
-                className="w-full h-14 text-lg font-medium rounded-2xl bg-primary hover:bg-primary/90 text-white shadow-[0_8px_20px_rgba(192,112,128,0.28)] transition-all hover:scale-[1.02] active:scale-[0.98]">
-                {createRoom.isPending ? <Loader2 className="w-5 h-5 animate-spin" /> : "Tạo phòng mới"}
-              </Button>
+              <form onSubmit={handleCreateRoom} className="space-y-3">
+                <div className="space-y-1.5">
+                  <label className="text-sm font-medium text-muted-foreground pl-1">Tên phòng <span className="text-primary/60">*</span></label>
+                  <Input
+                    placeholder="v.d. Nhạc thư giãn cuối tuần"
+                    value={newRoomName}
+                    onChange={(e) => setNewRoomName(e.target.value)}
+                    className="h-12 bg-white/50 border-primary/10 rounded-2xl shadow-sm focus-visible:ring-primary/30"
+                    maxLength={40}
+                  />
+                </div>
+                <Button
+                  type="submit"
+                  disabled={!displayName.trim() || !newRoomName.trim() || createRoom.isPending}
+                  className="w-full h-14 text-lg font-medium rounded-2xl bg-primary hover:bg-primary/90 text-white shadow-[0_8px_20px_rgba(192,112,128,0.28)] transition-all hover:scale-[1.02] active:scale-[0.98]">
+                  {createRoom.isPending ? <Loader2 className="w-5 h-5 animate-spin" /> : "Tạo phòng mới"}
+                </Button>
+              </form>
             </div>
 
             {/* Join room */}

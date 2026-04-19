@@ -23,7 +23,7 @@ router.post("/rooms", async (req, res): Promise<void> => {
   const id = genRoomId();
   const [room] = await db
     .insert(roomsTable)
-    .values({ id, hostName: parsed.data.hostName })
+    .values({ id, hostName: parsed.data.hostName, roomName: parsed.data.roomName })
     .returning();
 
   res.status(201).json(GetRoomResponse.parse({ ...room, createdAt: room.createdAt.toISOString() }));

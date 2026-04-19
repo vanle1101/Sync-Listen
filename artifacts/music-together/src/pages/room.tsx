@@ -398,17 +398,19 @@ function ThemeModal({
 
 /* ──────────────── Settings Modal ──────────────── */
 function SettingsModal({
-  roomId, hostName, listeners, isHost,
+  roomId, hostName, roomName: initialRoomName, listeners, isHost,
   themeId, onSelectTheme,
+  onRenameRoom,
   onClose,
 }: {
-  roomId: string; hostName: string; listeners: string[];
+  roomId: string; hostName: string; roomName: string; listeners: string[];
   isHost: boolean; themeId: string; onSelectTheme: (id: string) => void;
+  onRenameRoom: (name: string) => void;
   onClose: () => void;
 }) {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
-  const [roomName, setRoomName] = useState(hostName);
+  const [roomName, setRoomName] = useState(initialRoomName || hostName);
   const [isPublic, setIsPublic] = useState(true);
   const [password, setPassword] = useState("");
   const [showPass, setShowPass] = useState(false);
@@ -417,6 +419,10 @@ function SettingsModal({
 
   const handleSave = () => {
     onSelectTheme(localTheme);
+    const trimmedName = roomName.trim();
+    if (isHost && trimmedName && trimmedName !== (initialRoomName || hostName)) {
+      onRenameRoom(trimmedName);
+    }
     toast({ title: "Đã lưu cài đặt" });
     onClose();
   };
@@ -834,7 +840,7 @@ export default function Room() {
           <div className="flex items-center gap-1">
             <Lock className="w-3 h-3 text-foreground/40 shrink-0" />
             <span className="font-bold text-foreground/85 text-[14px] leading-tight truncate max-w-[140px]">
-              {roomState?.hostName ?? "..."}
+              {roomState?.roomName || roomState?.hostName || "..."}
             </span>
           </div>
           {/* Row 2: code · listeners · host badge · streak */}
@@ -1117,7 +1123,7 @@ export default function Room() {
       {shareOpen    && <ShareModal    roomId={roomId} onClose={() => setShareOpen(false)} />}
       {postcardOpen && <PostcardModal roomId={roomId} hostName={roomState?.hostName ?? ""} currentTrack={roomState?.currentTrack ?? null} listeners={roomState?.listeners ?? []} onClose={() => setPostcardOpen(false)} />}
       {themeOpen    && <ThemeModal    currentTheme={themeId} onSelect={setThemeId} bgImageUrl={bgImageUrl} onSetBgImage={handleSetBgImage} onClose={() => setThemeOpen(false)} />}
-      {settingsOpen && <SettingsModal roomId={roomId} hostName={roomState?.hostName ?? ""} listeners={roomState?.listeners ?? []} isHost={isHost} themeId={themeId} onSelectTheme={setThemeId} onClose={() => setSettingsOpen(false)} />}
+      {settingsOpen && <SettingsModal roomId={roomId} hostName={roomState?.hostName ?? ""} roomName={roomState?.roomName ?? ""} listeners={roomState?.listeners ?? []} isHost={isHost} themeId={themeId} onSelectTheme={setThemeId} onRenameRoom={(name) => sendAction({ type: "rename_room", roomName: name })} onClose={() => setSettingsOpen(false)} />}
       {donateOpen   && <DonateModal   onClose={() => setDonateOpen(false)} />}
     </div>
   );

@@ -97,6 +97,9 @@ export function useWebSocket(roomId: string, userName: string | null, avatarUrl?
             case "democracy_update":
               setRoomState(prev => prev ? { ...prev, democracyMode: msg.democracyMode } : null);
               break;
+            case "room_renamed":
+              setRoomState(prev => prev ? { ...prev, roomName: msg.roomName as string } : null);
+              break;
             case "listeners_update":
               setRoomState(prev => prev ? {
                 ...prev,

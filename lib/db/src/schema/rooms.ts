@@ -5,6 +5,7 @@ import { z } from "zod/v4";
 export const roomsTable = pgTable("rooms", {
   id: text("id").primaryKey(),
   hostName: text("host_name").notNull(),
+  roomName: text("room_name").notNull().default(""),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 

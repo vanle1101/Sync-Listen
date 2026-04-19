@@ -12,6 +12,8 @@ import {
 } from "./roomManager";
 import { logger } from "./logger";
 import { recordSession } from "./streakService";
+import { db, roomsTable } from "@workspace/db";
+import { eq } from "drizzle-orm";
 
 function broadcastPlayback(roomId: string, room: ReturnType<typeof getRoomState>) {
   if (!room) return;
@@ -55,20 +57,29 @@ export function setupWebSocketServer(server: http.Server): void {
         }
         currentRoomId = roomId;
         currentUserName = userName;
-        const room = getOrCreateRoomState(roomId, userName);
-        // Store avatar URL (only https:// URLs for security, not base64)
-        const avatarUrl = msg.avatarUrl as string | undefined;
-        if (avatarUrl && typeof avatarUrl === 'string' && avatarUrl.startsWith('https://')) {
-          room.userAvatars[userName] = avatarUrl.substring(0, 512);
-        }
-        addListener(roomId, ws, userName);
-        sendToSocket(ws, { type: "room_state", room });
-        broadcast(roomId, { type: "listeners_update", listeners: room.listeners, hostName: room.hostName, userAvatars: room.userAvatars }, ws);
-        logger.info({ roomId, userName }, "User joined room");
-        // Record streak session if ≥2 listeners are now present
-        if (room.listeners.length >= 2) {
-          recordSession(roomId).catch(() => {});
-        }
+        // Load roomName from DB (async, but we still set up the room immediately)
+        (async () => {
+          let dbRoomName = "";
+          try {
+            const [dbRoom] = await db.select().from(roomsTable).where(eq(roomsTable.id, roomId));
+            if (dbRoom) dbRoomName = dbRoom.roomName;
+          } catch {}
+          const room = getOrCreateRoomState(roomId, userName, dbRoomName);
+          // Update roomName in case it was already created in memory without it
+          if (dbRoomName && !room.roomName) room.roomName = dbRoomName;
+          // Store avatar URL (only https:// URLs for security, not base64)
+          const avatarUrl = msg.avatarUrl as string | undefined;
+          if (avatarUrl && typeof avatarUrl === 'string' && avatarUrl.startsWith('https://')) {
+            room.userAvatars[userName] = avatarUrl.substring(0, 512);
+          }
+          addListener(roomId, ws, userName);
+          sendToSocket(ws, { type: "room_state", room });
+          broadcast(roomId, { type: "listeners_update", listeners: room.listeners, hostName: room.hostName, userAvatars: room.userAvatars }, ws);
+          logger.info({ roomId, userName }, "User joined room");
+          if (room.listeners.length >= 2) {
+            recordSession(roomId).catch(() => {});
+          }
+        })();
         return;
       }
 
@@ -94,6 +105,16 @@ export function setupWebSocketServer(server: http.Server): void {
           room.chatHistory.push(chatMsg);
           if (room.chatHistory.length > 100) room.chatHistory.shift();
           broadcast(currentRoomId, { type: "chat", ...chatMsg });
+          break;
+        }
+
+        case "rename_room": {
+          if (!isHost) { sendToSocket(ws, { type: "error", message: "Only host" }); break; }
+          const newRoomName = (msg.roomName as string | undefined)?.trim();
+          if (!newRoomName) { sendToSocket(ws, { type: "error", message: "Tên phòng không được để trống" }); break; }
+          room.roomName = newRoomName;
+          db.update(roomsTable).set({ roomName: newRoomName }).where(eq(roomsTable.id, currentRoomId)).catch(() => {});
+          broadcast(currentRoomId, { type: "room_renamed", roomName: newRoomName });
           break;
         }
 

@@ -17,6 +17,7 @@ export type RepeatMode = 'none' | 'one' | 'all';
 export interface RoomState {
   roomId: string;
   hostName: string;
+  roomName: string;
   listeners: string[];
   userAvatars: Record<string, string>;
   playlist: Track[];

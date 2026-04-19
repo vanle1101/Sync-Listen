@@ -20,6 +20,7 @@ export const HealthCheckResponse = zod.object({
  */
 export const CreateRoomBody = zod.object({
   hostName: zod.string(),
+  roomName: zod.string(),
 });
 
 /**
@@ -32,6 +33,7 @@ export const GetRoomParams = zod.object({
 export const GetRoomResponse = zod.object({
   id: zod.string(),
   hostName: zod.string(),
+  roomName: zod.string(),
   createdAt: zod.string(),
 });
 
