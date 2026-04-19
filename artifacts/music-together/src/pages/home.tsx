@@ -179,7 +179,7 @@ export default function Home() {
 
       <div className="w-full max-w-5xl grid md:grid-cols-2 gap-12 items-start z-10 relative">
         {/* Left: branding */}
-        <div className="space-y-6 text-center md:text-left">
+        <div className="space-y-6 text-center md:text-left select-none">
           <div className="inline-flex items-center justify-center p-4 bg-white/80 rounded-3xl border border-primary/10 mb-4 shadow-sm soft-glow">
             <Music className="w-8 h-8 text-primary" />
           </div>
