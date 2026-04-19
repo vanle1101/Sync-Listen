@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import { Track, ChatMessage } from "@/lib/types";
 import { Input } from "@/components/ui/input";
-import { Send, Smile, X, Plus, Search, Loader2, Check, Trash2, Play, Bell, BellOff, Mic, MicOff, ImagePlus, ChevronDown, Music2 } from "lucide-react";
+import { Send, Smile, X, Plus, Search, Loader2, Check, Trash2, Play, Bell, BellOff, Mic, MicOff, ImagePlus, ChevronDown, Music2, Link } from "lucide-react";
 import { useYoutubeSearch, getYoutubeSearchQueryKey } from "@workspace/api-client-react";
 import Picker from "@emoji-mart/react";
 import data from "@emoji-mart/data";
@@ -208,25 +208,74 @@ function PlaylistTab({ playlist, playedTracks, currentTrack, isHost, onAddTrack,
   const [addedIds, setAddedIds] = useState<Set<string>>(new Set());
   const [mode, setMode] = useState<"queue" | "search">("queue");
 
+  const [urlLoading, setUrlLoading] = useState(false);
+  const [urlError, setUrlError] = useState<string | null>(null);
+
   useEffect(() => {
-    if (!isHost) { setMode("queue"); setQuery(""); setSearchQuery(""); }
+    if (!isHost) { setMode("queue"); setQuery(""); setSearchQuery(""); setUrlError(null); }
   }, [isHost]);
 
-  const { data: results, isLoading } = useYoutubeSearch(
+  const extractVideoId = (s: string): string | null => {
+    try {
+      if (s.includes("youtube.com") || s.includes("youtu.be")) {
+        const url = new URL(s.startsWith("http") ? s : "https://" + s);
+        if (url.hostname === "youtu.be") return url.pathname.slice(1).split(/[?&]/)[0];
+        if (url.pathname.startsWith("/shorts/")) return url.pathname.split("/shorts/")[1].split(/[?&/]/)[0];
+        if (url.pathname.startsWith("/embed/")) return url.pathname.split("/embed/")[1].split(/[?&/]/)[0];
+        if (url.pathname.startsWith("/live/")) return url.pathname.split("/live/")[1].split(/[?&/]/)[0];
+        const v = url.searchParams.get("v");
+        if (v) return v;
+      }
+      if (/^[a-zA-Z0-9_-]{11}$/.test(s)) return s;
+    } catch {}
+    return null;
+  };
+
+  const isYoutubeUrl = !!extractVideoId(query.trim());
+
+  const { data: results, isLoading: searchLoading } = useYoutubeSearch(
     { q: searchQuery },
-    { query: { enabled: !!searchQuery, queryKey: getYoutubeSearchQueryKey({ q: searchQuery }) } }
+    { query: { enabled: !!searchQuery && !isYoutubeUrl, queryKey: getYoutubeSearchQueryKey({ q: searchQuery }) } }
   );
 
-  const handleSearch = (e: React.FormEvent) => {
+  const isLoading = searchLoading || urlLoading;
+
+  const markAdded = (videoId: string) => {
+    setAddedIds(prev => new Set([...prev, videoId]));
+    setTimeout(() => setAddedIds(prev => { const n = new Set(prev); n.delete(videoId); return n; }), 2000);
+  };
+
+  const handleSearch = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (query.trim()) { setSearchQuery(query.trim()); setMode("search"); }
+    const q = query.trim();
+    if (!q) return;
+    setUrlError(null);
+    const videoId = extractVideoId(q);
+    if (videoId) {
+      setUrlLoading(true);
+      try {
+        const res = await fetch(`/api/youtube/video/${videoId}`);
+        if (!res.ok) throw new Error();
+        const video = await res.json();
+        onAddTrack({ videoId: video.videoId, title: video.title, channelTitle: video.channelTitle, thumbnail: video.thumbnail, duration: video.duration });
+        markAdded(video.videoId);
+        setQuery("");
+        setMode("queue");
+      } catch {
+        setUrlError("Không tải được video. Thử lại nhé!");
+      } finally {
+        setUrlLoading(false);
+      }
+    } else {
+      setSearchQuery(q);
+      setMode("search");
+    }
   };
   const handleAdd = (video: any) => {
     onAddTrack({ videoId: video.videoId, title: video.title, channelTitle: video.channelTitle, thumbnail: video.thumbnail, duration: video.duration });
-    setAddedIds(prev => new Set([...prev, video.videoId]));
-    setTimeout(() => setAddedIds(prev => { const n = new Set(prev); n.delete(video.videoId); return n; }), 2000);
+    markAdded(video.videoId);
   };
-  const clearSearch = () => { setQuery(""); setSearchQuery(""); setMode("queue"); };
+  const clearSearch = () => { setQuery(""); setSearchQuery(""); setMode("queue"); setUrlError(null); };
 
   return (
     <div className="flex flex-col flex-1 min-h-0">
@@ -234,17 +283,26 @@ function PlaylistTab({ playlist, playedTracks, currentTrack, isHost, onAddTrack,
         <div className="p-3 border-b border-primary/5 bg-white/40 shrink-0">
           <form onSubmit={handleSearch} className="flex gap-2">
             <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-primary/40" />
-              <Input value={query} onChange={e => setQuery(e.target.value)}
+              {isYoutubeUrl
+                ? <Link className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-primary/60" />
+                : <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-primary/40" />}
+              <Input value={query} onChange={e => { setQuery(e.target.value); setUrlError(null); }}
                 placeholder="Dán link hoặc nhập tên bài hát..."
                 className="pl-9 h-10 bg-white border-primary/10 rounded-2xl text-sm focus-visible:ring-primary/20 shadow-sm" />
             </div>
-            <button type="submit"
-              className="w-10 h-10 rounded-2xl bg-primary/10 hover:bg-primary text-primary hover:text-white flex items-center justify-center transition-all shrink-0">
-              <Plus className="w-5 h-5" />
+            <button type="submit" disabled={isLoading}
+              className="w-10 h-10 rounded-2xl bg-primary/10 hover:bg-primary text-primary hover:text-white flex items-center justify-center transition-all shrink-0 disabled:opacity-50">
+              {urlLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-5 h-5" />}
             </button>
           </form>
-          {mode === "search" && (
+          {isYoutubeUrl && !urlError && (
+            <p className="text-[11px] text-primary/60 mt-1 pl-1 flex items-center gap-1">
+              <span className="w-1.5 h-1.5 bg-primary/50 rounded-full inline-block" />
+              Link YouTube — nhấn + để thêm ngay
+            </p>
+          )}
+          {urlError && <p className="text-[11px] text-red-400 mt-1 pl-1">{urlError}</p>}
+          {mode === "search" && !isYoutubeUrl && (
             <button onClick={clearSearch} className="flex items-center gap-1 text-xs text-primary/60 hover:text-primary mt-2 pl-1 transition-colors">
               <X className="w-3 h-3" /> Về hàng đợi
             </button>
