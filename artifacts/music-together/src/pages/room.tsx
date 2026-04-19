@@ -9,9 +9,9 @@ import { YoutubePlayer } from "@/components/youtube-player";
 import { PlayerControls } from "@/components/player-controls";
 import { RightPanel } from "@/components/right-panel";
 import {
-  Music, Loader2, Copy, LogOut, Minimize2, Share2, CreditCard,
+  Music, Loader2, Copy, LogOut, Minimize2, Maximize2, Share2, CreditCard,
   Palette, Coffee, Settings, Globe, Users, X, Download, Check, Heart, ImagePlus, Power, Lock, Eye, EyeOff,
-  MessageCircle, Send, ChevronDown
+  MessageCircle, Send, ChevronDown, Play, Pause, SkipForward
 } from "lucide-react";
 import { useGetRoom, getGetRoomQueryKey } from "@workspace/api-client-react";
 
@@ -852,12 +852,18 @@ export default function Room() {
         <div className="flex-1" />
 
         {/* Toolbar */}
-        <div className="flex items-center gap-0.5 shrink-0">
-          <ToolBtn icon={Minimize2} shortLabel="Thu gọn" label="Thu gọn player" onClick={() => setCompact(c => !c)} active={compact} />
+        <div className="flex items-center gap-0.5 shrink-0 overflow-x-auto">
+          <div className="hidden md:contents">
+            <ToolBtn icon={Minimize2} shortLabel="Thu gọn" label="Thu gọn player" onClick={() => setCompact(c => !c)} active={compact} />
+          </div>
           <ToolBtn icon={Share2}    shortLabel="Chia sẻ"   label="Chia sẻ phòng" onClick={() => setShareOpen(true)} />
-          <ToolBtn icon={CreditCard} shortLabel="Bưu thiếp" label="Bưu thiếp phòng" onClick={() => setPostcardOpen(true)} />
+          <div className="hidden md:contents">
+            <ToolBtn icon={CreditCard} shortLabel="Bưu thiếp" label="Bưu thiếp phòng" onClick={() => setPostcardOpen(true)} />
+          </div>
           <ToolBtn icon={Palette}   shortLabel="Giao diện"  label="Giao diện phòng" onClick={() => setThemeOpen(true)} />
-          <ToolBtn icon={Coffee}    shortLabel="Tách cafe"  label="Ủng hộ admin một tách cafe ☕" onClick={() => setDonateOpen(true)} accent />
+          <div className="hidden sm:contents">
+            <ToolBtn icon={Coffee}    shortLabel="Tách cafe"  label="Ủng hộ admin một tách cafe ☕" onClick={() => setDonateOpen(true)} accent />
+          </div>
 
           {/* Democracy mode — all see it; only real host can toggle */}
           <ToolBtn
@@ -881,7 +887,7 @@ export default function Room() {
         {(!compact || fullscreen) && (
           <div className={fullscreen
             ? "fixed inset-0 z-[200] bg-black flex flex-col"
-            : "flex-1 flex flex-col min-w-0 overflow-y-auto min-h-0 p-5 gap-4"}>
+            : "hidden md:flex flex-1 flex-col min-w-0 overflow-y-auto min-h-0 p-5 gap-4"}>
 
             {/* YouTube player */}
             {showPlayer ? (
@@ -998,7 +1004,7 @@ export default function Room() {
         )}
 
         {/* Right: Panel */}
-        <div className={`${compact ? 'flex-1' : 'w-[340px] xl:w-[380px]'} flex flex-col min-h-0 shrink-0`}>
+        <div className={`${compact ? 'flex-1' : 'w-full md:w-[340px] xl:w-[380px]'} flex flex-col min-h-0 shrink-0`}>
           <RightPanel
             playlist={roomState?.playlist || []}
             playedTracks={roomState?.playedTracks || []}
@@ -1019,6 +1025,58 @@ export default function Room() {
           />
         </div>
       </div>
+
+      {/* ── Mobile mini-player bar (hidden on desktop) ── */}
+      {!fullscreen && roomState?.currentTrack && (
+        <div className="md:hidden shrink-0 flex items-center gap-3 px-3 py-2.5 bg-white/85 backdrop-blur-md border-t border-primary/10 shadow-[0_-4px_20px_rgba(192,112,128,0.1)]">
+          {/* Thumbnail */}
+          <div className="relative w-11 h-11 rounded-xl overflow-hidden shrink-0 shadow-sm">
+            <img src={roomState.currentTrack.thumbnail} alt="" className="w-full h-full object-cover" />
+            {roomState.playing && (
+              <div className="absolute inset-0 bg-primary/25 flex items-center justify-center">
+                <div className="flex gap-0.5 items-end h-3">
+                  {[3,2,4].map((h, i) => (
+                    <span key={i} className="w-0.5 bg-white rounded-full animate-bounce" style={{ height: h * 3, animationDelay: `${i * 0.15}s` }} />
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+          {/* Title + seek */}
+          <div className="flex-1 min-w-0">
+            <p className="text-xs font-semibold text-foreground/80 truncate leading-tight">{roomState.currentTrack.title}</p>
+            <p className="text-[10px] text-muted-foreground/50 truncate">{roomState.currentTrack.channelTitle}</p>
+            <div className="mt-1.5 relative h-1 bg-primary/10 rounded-full overflow-hidden">
+              <div
+                className="h-full bg-gradient-to-r from-primary to-secondary rounded-full transition-none"
+                style={{ width: `${playerDuration > 0 ? (playerCurrentTime / playerDuration) * 100 : 0}%` }}
+              />
+            </div>
+          </div>
+          {/* Controls */}
+          <div className="flex items-center gap-1 shrink-0">
+            <button
+              onClick={handlePlayPause}
+              disabled={!effectiveIsHost}
+              className="w-10 h-10 rounded-full bg-primary/8 flex items-center justify-center text-primary disabled:opacity-40 active:scale-95 transition-transform">
+              {roomState.playing
+                ? <Pause className="w-4 h-4 fill-current" />
+                : <Play className="w-4 h-4 fill-current ml-0.5" />}
+            </button>
+            <button
+              onClick={handleSkip}
+              disabled={!effectiveIsHost}
+              className="w-9 h-9 rounded-full flex items-center justify-center text-muted-foreground/50 disabled:opacity-30 active:scale-95 transition-transform">
+              <SkipForward className="w-4 h-4 fill-current" />
+            </button>
+            <button
+              onClick={() => { setFullscreen(true); setFsChatOpen(false); setFsChatMinimized(false); setFsUnread(0); }}
+              className="w-9 h-9 rounded-full flex items-center justify-center text-muted-foreground/50 active:scale-95 transition-transform">
+              <Maximize2 className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* ── Modals ──────────────────────────── */}
       {shareOpen    && <ShareModal    roomId={roomId} onClose={() => setShareOpen(false)} />}
