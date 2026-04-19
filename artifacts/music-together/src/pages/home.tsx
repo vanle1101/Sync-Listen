@@ -173,7 +173,7 @@ export default function Home() {
   };
 
   return (
-    <div className="min-h-screen w-full flex items-center justify-center p-4 relative overflow-hidden petal-bg">
+    <div className="min-h-screen w-full flex flex-col items-center justify-center p-4 pb-12 relative overflow-hidden petal-bg">
       <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-primary/5 rounded-full blur-[100px] pointer-events-none" />
       <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-secondary/5 rounded-full blur-[100px] pointer-events-none" />
 
@@ -390,7 +390,7 @@ export default function Home() {
       </div>
 
       {/* Footer */}
-      <footer className="absolute bottom-4 left-0 right-0 flex justify-center pointer-events-none z-10">
+      <footer className="mt-8 flex justify-center pointer-events-none z-10 relative">
         <p className="text-[11px] text-muted-foreground/40 tracking-wide select-none text-center">
           <span className="font-semibold text-primary/40">Chillwithvan</span>
           {" "}© 2026 — Miễn phí, không quảng cáo, không cần tài khoản
