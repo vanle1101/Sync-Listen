@@ -9,7 +9,7 @@ import { PlayerControls } from "@/components/player-controls";
 import { PlaylistPanel } from "@/components/playlist-panel";
 import { SearchPanel } from "@/components/search-panel";
 import { ChatPanel } from "@/components/chat-panel";
-import { Copy, LogOut, Loader2, Music } from "lucide-react";
+import { Copy, LogOut, Loader2, Music, MessageSquare, MessageSquareOff } from "lucide-react";
 import { useGetRoom, getGetRoomQueryKey } from "@workspace/api-client-react";
 
 export default function Room() {
@@ -19,6 +19,7 @@ export default function Room() {
   const { toast } = useToast();
   
   const [userName, setUserName] = useState<string | null>(null);
+  const [isChatOpen, setIsChatOpen] = useState(true);
   
   useEffect(() => {
     const name = sessionStorage.getItem("music-together-name");
@@ -152,6 +153,16 @@ export default function Room() {
             <Copy className="w-4 h-4" />
             Sao chép link
           </Button>
+
+          <Button
+            variant="ghost"
+            size="icon"
+            className={`rounded-xl transition-all ${isChatOpen ? 'text-primary bg-primary/10' : 'text-muted-foreground hover:text-primary hover:bg-primary/5'}`}
+            onClick={() => setIsChatOpen(o => !o)}
+            title={isChatOpen ? 'Ẩn chat' : 'Hiện chat'}
+          >
+            {isChatOpen ? <MessageSquare className="w-5 h-5" /> : <MessageSquareOff className="w-5 h-5" />}
+          </Button>
           
           <Button variant="ghost" size="icon" className="text-muted-foreground hover:text-primary hover:bg-primary/5 rounded-xl" onClick={handleLeave}>
             <LogOut className="w-5 h-5" />
@@ -201,14 +212,16 @@ export default function Room() {
           </div>
         </div>
 
-        {/* Right Column: Chat */}
-        <div className="w-full lg:w-[380px] xl:w-[420px] h-[500px] lg:h-auto shrink-0 flex flex-col min-h-0">
-          <ChatPanel 
-            messages={roomState?.chatHistory || []}
-            onSendMessage={handleSendMessage}
-            currentUser={userName || ""}
-          />
-        </div>
+        {/* Right Column: Chat (toggleable) */}
+        {isChatOpen && (
+          <div className="w-full lg:w-[300px] xl:w-[340px] h-[400px] lg:h-auto shrink-0 flex flex-col min-h-0">
+            <ChatPanel 
+              messages={roomState?.chatHistory || []}
+              onSendMessage={handleSendMessage}
+              currentUser={userName || ""}
+            />
+          </div>
+        )}
       </main>
     </div>
   );
