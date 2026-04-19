@@ -9,7 +9,7 @@ import { YoutubePlayer } from "@/components/youtube-player";
 import { PlayerControls } from "@/components/player-controls";
 import { RightPanel } from "@/components/right-panel";
 import {
-  Music, Loader2, Copy, LogOut, Minimize2, Maximize2, Share2, CreditCard,
+  Music, Loader2, Copy, LogOut, Minimize2, Share2, CreditCard,
   Palette, Coffee, Settings, Globe, Users, X, Download, Check, Heart, ImagePlus, Power, Lock, Eye, EyeOff,
   MessageCircle, Send, ChevronDown
 } from "lucide-react";
@@ -854,7 +854,6 @@ export default function Room() {
         {/* Toolbar */}
         <div className="flex items-center gap-0.5 shrink-0">
           <ToolBtn icon={Minimize2} shortLabel="Thu gọn" label="Thu gọn player" onClick={() => setCompact(c => !c)} active={compact} />
-          <ToolBtn icon={Maximize2} shortLabel="Toàn màn hình" label="Xem toàn màn hình" onClick={() => { setFullscreen(f => !f); setFsChatOpen(false); setFsChatMinimized(false); setFsUnread(0); }} active={fullscreen} />
           <ToolBtn icon={Share2}    shortLabel="Chia sẻ"   label="Chia sẻ phòng" onClick={() => setShareOpen(true)} />
           <ToolBtn icon={CreditCard} shortLabel="Bưu thiếp" label="Bưu thiếp phòng" onClick={() => setPostcardOpen(true)} />
           <ToolBtn icon={Palette}   shortLabel="Giao diện"  label="Giao diện phòng" onClick={() => setThemeOpen(true)} />
@@ -917,6 +916,7 @@ export default function Room() {
                 onVolumeChange={setVolume}
                 onRepeat={handleRepeat}
                 onShuffle={handleShuffle}
+                onFullscreen={() => { setFullscreen(true); setFsChatOpen(false); setFsChatMinimized(false); setFsUnread(0); }}
                 disabled={!roomState?.currentTrack}
               />
             )}

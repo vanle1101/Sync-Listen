@@ -1,5 +1,5 @@
 import { useState, useRef } from "react";
-import { Play, Pause, SkipForward, SkipBack, Volume2, VolumeX, Shuffle, Repeat, Repeat1 } from "lucide-react";
+import { Play, Pause, SkipForward, SkipBack, Volume2, VolumeX, Shuffle, Repeat, Repeat1, Maximize2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { RepeatMode } from "@/lib/types";
 
@@ -18,6 +18,7 @@ interface PlayerControlsProps {
   onVolumeChange: (vol: number) => void;
   onRepeat: () => void;
   onShuffle: () => void;
+  onFullscreen?: () => void;
   disabled?: boolean;
 }
 
@@ -31,7 +32,7 @@ function formatTime(s: number) {
 export function PlayerControls({
   isHost, playing, currentTime, duration, volume,
   repeatMode, shuffle,
-  onPlayPause, onSkip, onPrev, onSeek, onVolumeChange, onRepeat, onShuffle,
+  onPlayPause, onSkip, onPrev, onSeek, onVolumeChange, onRepeat, onShuffle, onFullscreen,
   disabled = false
 }: PlayerControlsProps) {
   const [dragging, setDragging] = useState(false);
@@ -189,13 +190,21 @@ export function PlayerControls({
           </button>
         </div>
 
-        {/* Right: host badge or spacer */}
-        <div className="flex-1 flex justify-end">
+        {/* Right: fullscreen + host badge */}
+        <div className="flex-1 flex items-center justify-end gap-2">
           {!isHost && (
             <div className="text-xs font-medium text-primary/60 bg-primary/5 px-2 py-1 rounded-full flex items-center gap-1 border border-primary/10">
               <span className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse"></span>
               Host điều khiển
             </div>
+          )}
+          {onFullscreen && (
+            <button
+              onClick={onFullscreen}
+              title="Toàn màn hình"
+              className="w-8 h-8 rounded-full border border-primary/20 bg-white shadow-sm hover:bg-primary/5 hover:scale-110 active:scale-95 text-primary/70 hover:text-primary flex items-center justify-center transition-all duration-200">
+              <Maximize2 className="w-4 h-4" />
+            </button>
           )}
         </div>
       </div>
