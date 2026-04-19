@@ -378,7 +378,7 @@ export default function Room() {
   const handleSeek = (time: number) => sendAction({ type: "seek", currentTime: time });
   const handlePlayPause = () => {
     if (!roomState) return;
-    sendAction({ type: "play_pause", playing: !roomState.playing, currentTime: roomState.currentTime });
+    sendAction({ type: "play_pause", playing: !roomState.playing, currentTime: playerCurrentTime });
   };
   const handleSkip = () => sendAction({ type: "skip" });
   const handlePrev = () => sendAction({ type: "prev_track" });
