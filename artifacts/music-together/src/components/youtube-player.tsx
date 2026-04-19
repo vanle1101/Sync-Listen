@@ -113,6 +113,10 @@ export function YoutubePlayer({
     }
   }, [currentTrack?.videoId, isReady]);
 
+  // Track prev serverTime to detect explicit seeks
+  const prevServerTimeRef = useRef<number>(serverTime);
+  const prevServerTimeStampRef = useRef<number>(Date.now());
+
   // Playback sync
   useEffect(() => {
     if (!isReady || !playerRef.current || !currentTrack) return;
@@ -124,9 +128,19 @@ export function YoutubePlayer({
         playerRef.current.pauseVideo();
       }
       const playerTime = playerRef.current.getCurrentTime() || 0;
-      if (Math.abs(playerTime - serverTime) > 2) {
+
+      // Detect explicit seek vs natural playback drift
+      const elapsed = (Date.now() - prevServerTimeStampRef.current) / 1000;
+      const expectedServerTime = prevServerTimeRef.current + (playing ? elapsed : 0);
+      const isExplicitSeek = Math.abs(serverTime - expectedServerTime) > 1;
+      const driftThreshold = isExplicitSeek ? 0.5 : 2;
+
+      if (Math.abs(playerTime - serverTime) > driftThreshold) {
         playerRef.current.seekTo(serverTime, true);
       }
+
+      prevServerTimeRef.current = serverTime;
+      prevServerTimeStampRef.current = Date.now();
     } catch (err) {
       console.error("YT Player error", err);
     }

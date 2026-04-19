@@ -273,7 +273,7 @@ export function setupWebSocketServer(server: http.Server): void {
             currentTime: room.currentTime,
             videoId: room.currentTrack?.videoId ?? null,
             currentTrack: room.currentTrack ?? null,
-          }, ws);
+          });
           break;
         }
 
