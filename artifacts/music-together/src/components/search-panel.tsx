@@ -54,7 +54,7 @@ export function SearchPanel({ onAddTrack }: SearchPanelProps) {
         </form>
       </div>
       
-      <div className="flex-1 overflow-y-auto p-3 min-h-0">
+      <div className="flex-1 overflow-y-auto overflow-x-hidden p-3 min-h-0">
         {isLoading ? (
           <div className="h-full flex items-center justify-center p-12">
             <Loader2 className="w-8 h-8 animate-spin text-primary/60" />
@@ -62,20 +62,20 @@ export function SearchPanel({ onAddTrack }: SearchPanelProps) {
         ) : results && results.length > 0 ? (
           <div className="space-y-2">
             {results.map((video) => (
-              <div key={video.videoId} className="flex items-center gap-3 p-3 rounded-2xl hover:bg-white border border-transparent transition-all duration-300 hover:shadow-md hover:border-primary/10">
+              <div key={video.videoId} className="relative flex items-center gap-3 p-3 pr-14 rounded-2xl hover:bg-white border border-transparent transition-all duration-300 hover:shadow-md hover:border-primary/10">
                 <div className="relative w-16 h-12 rounded-xl overflow-hidden flex-shrink-0 bg-muted shadow-sm">
                   <img src={video.thumbnail} alt="" className="w-full h-full object-cover" />
                 </div>
                 
                 <div className="flex-1 min-w-0">
-                  <h4 className="text-sm font-semibold text-foreground truncate leading-snug">{video.title}</h4>
-                  <p className="text-xs text-muted-foreground/70 truncate mt-0.5">{video.channelTitle}</p>
+                  <h4 className="text-sm font-semibold text-foreground leading-snug line-clamp-2">{video.title}</h4>
+                  <p className="text-xs text-muted-foreground/70 mt-0.5">{video.channelTitle}</p>
                 </div>
                 
                 <Button 
                   size="icon" 
                   variant="ghost"
-                  className={`h-9 w-9 rounded-xl shrink-0 transition-all active:scale-95 border ${
+                  className={`absolute right-3 top-1/2 -translate-y-1/2 h-9 w-9 rounded-xl transition-all active:scale-95 border ${
                     addedIds.has(video.videoId)
                       ? 'text-white bg-secondary border-secondary'
                       : 'text-primary hover:text-white hover:bg-primary border-primary/20 hover:border-primary'
