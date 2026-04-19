@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useCallback } from "react";
 import { Switch, Route, Router as WouterRouter, useLocation } from "wouter";
 import { QueryClient, QueryClientProvider, useQueryClient } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
@@ -7,6 +7,62 @@ import { ClerkProvider, SignIn, SignUp, useClerk } from "@clerk/react";
 import NotFound from "@/pages/not-found";
 import Home from "@/pages/home";
 import Room from "@/pages/room";
+
+/* ── Peach blossom SVG paths (5 petals) ── */
+const BLOSSOM_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="18" height="18">
+  <g transform="translate(12,12)">
+    <ellipse rx="3.5" ry="6" fill="{{COLOR}}" opacity="0.92" transform="rotate(0)" cy="-4"/>
+    <ellipse rx="3.5" ry="6" fill="{{COLOR}}" opacity="0.88" transform="rotate(72)" cy="-4"/>
+    <ellipse rx="3.5" ry="6" fill="{{COLOR}}" opacity="0.92" transform="rotate(144)" cy="-4"/>
+    <ellipse rx="3.5" ry="6" fill="{{COLOR}}" opacity="0.88" transform="rotate(216)" cy="-4"/>
+    <ellipse rx="3.5" ry="6" fill="{{COLOR}}" opacity="0.92" transform="rotate(288)" cy="-4"/>
+    <circle r="2.2" fill="#fff6e0"/>
+    <circle r="1.2" fill="#f9c1cb"/>
+  </g>
+</svg>`;
+
+const PETAL_COLORS = ["#f4a7b9", "#f9c0cc", "#e8829c", "#fbc8d4", "#f06090", "#fad4de"];
+
+function BlossomEffect() {
+  const spawnBlossom = useCallback((e: MouseEvent) => {
+    const count = 7 + Math.floor(Math.random() * 5);
+    for (let i = 0; i < count; i++) {
+      const angle = (Math.PI * 2 * i) / count + (Math.random() - 0.5) * 0.6;
+      const dist = 40 + Math.random() * 60;
+      const tx = Math.cos(angle) * dist;
+      const ty = Math.sin(angle) * dist;
+      const rot = (Math.random() - 0.5) * 540;
+      const dur = 0.55 + Math.random() * 0.35;
+      const size = 12 + Math.random() * 10;
+      const color = PETAL_COLORS[Math.floor(Math.random() * PETAL_COLORS.length)];
+      const delay = Math.random() * 0.08;
+
+      const div = document.createElement("div");
+      div.className = "blossom-petal";
+      div.style.cssText = `
+        left: ${e.clientX - size / 2}px;
+        top:  ${e.clientY - size / 2}px;
+        width: ${size}px;
+        height: ${size}px;
+        --bx: ${tx}px;
+        --by: ${ty}px;
+        --br: ${rot}deg;
+        --bd: ${dur}s;
+        animation-delay: ${delay}s;
+      `;
+      div.innerHTML = BLOSSOM_SVG.replaceAll("{{COLOR}}", color);
+      document.body.appendChild(div);
+      setTimeout(() => div.remove(), (dur + delay + 0.1) * 1000);
+    }
+  }, []);
+
+  useEffect(() => {
+    document.addEventListener("click", spawnBlossom);
+    return () => document.removeEventListener("click", spawnBlossom);
+  }, [spawnBlossom]);
+
+  return null;
+}
 
 const queryClient = new QueryClient();
 
@@ -175,6 +231,7 @@ function ClerkProviderWithRoutes() {
       <QueryClientProvider client={queryClient}>
         <ClerkQueryClientCacheInvalidator />
         <TooltipProvider>
+          <BlossomEffect />
           <Router />
           <Toaster />
         </TooltipProvider>

@@ -170,3 +170,18 @@ a, button, [role="button"], input, select, textarea, label,
   box-shadow: none !important;
   border: none !important;
 }
+
+/* ── Peach blossom click effect ── */
+@keyframes blossom-burst {
+  0%   { opacity: 1; transform: translate(0, 0) rotate(0deg) scale(1); }
+  60%  { opacity: 0.9; }
+  100% { opacity: 0; transform: translate(var(--bx), var(--by)) rotate(var(--br)) scale(0.25); }
+}
+
+.blossom-petal {
+  position: fixed;
+  pointer-events: none;
+  z-index: 99999;
+  animation: blossom-burst var(--bd, 0.7s) ease-out forwards;
+  will-change: transform, opacity;
+}
