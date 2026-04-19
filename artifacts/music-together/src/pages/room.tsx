@@ -134,91 +134,107 @@ function ShareModal({ roomId, onClose }: { roomId: string; onClose: () => void }
 }
 
 /* ──────────────── Postcard Modal ──────────────── */
-function PostcardModal({ roomId, hostName, onClose }: { roomId: string; hostName: string; onClose: () => void }) {
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  const [drawn, setDrawn] = useState(false);
+function PostcardModal({
+  roomId, hostName, currentTrack, listeners, onClose,
+}: {
+  roomId: string; hostName: string; currentTrack: Track | null;
+  listeners: string[]; onClose: () => void;
+}) {
+  const cardRef = useRef<HTMLDivElement>(null);
+  const [downloading, setDownloading] = useState(false);
+  const [shared, setShared] = useState(false);
+  const joinUrl = `${window.location.origin}/room/${roomId}`;
+  const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=140x140&data=${encodeURIComponent(joinUrl)}&bgcolor=fdf6f0&color=3d1a1a&format=png&margin=6&qzone=1`;
 
-  useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return;
-    canvas.width = 600; canvas.height = 380;
+  const download = async () => {
+    if (!cardRef.current) return;
+    setDownloading(true);
+    try {
+      const { toPng } = await import("html-to-image");
+      const dataUrl = await toPng(cardRef.current, { pixelRatio: 2, cacheBust: true });
+      const a = document.createElement("a");
+      a.href = dataUrl;
+      a.download = `music-together-${roomId}.png`;
+      a.click();
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setDownloading(false);
+    }
+  };
 
-    // Background gradient
-    const grad = ctx.createLinearGradient(0, 0, 600, 380);
-    grad.addColorStop(0, "#fdf6f0"); grad.addColorStop(0.5, "#fce8e8"); grad.addColorStop(1, "#eef5ef");
-    ctx.fillStyle = grad; ctx.fillRect(0, 0, 600, 380);
-
-    // Decorative circles
-    ctx.beginPath(); ctx.arc(50, 50, 80, 0, Math.PI * 2);
-    ctx.fillStyle = "rgba(192,112,128,0.07)"; ctx.fill();
-    ctx.beginPath(); ctx.arc(560, 340, 100, 0, Math.PI * 2);
-    ctx.fillStyle = "rgba(122,158,126,0.07)"; ctx.fill();
-
-    // Music notes watermark
-    ctx.font = "bold 60px serif"; ctx.fillStyle = "rgba(192,112,128,0.12)";
-    ctx.fillText("♪", 30, 200); ctx.fillText("♫", 520, 120);
-    ctx.font = "bold 40px serif"; ctx.fillText("♩", 540, 300); ctx.fillText("♬", 20, 320);
-
-    // Logo icon (circle)
-    ctx.beginPath(); ctx.arc(80, 60, 32, 0, Math.PI * 2);
-    ctx.fillStyle = "rgba(192,112,128,0.15)"; ctx.fill();
-    ctx.font = "28px serif"; ctx.fillStyle = "#c07080";
-    ctx.textAlign = "center"; ctx.fillText("♫", 80, 70);
-
-    // App name
-    ctx.textAlign = "left";
-    ctx.font = "italic bold 28px serif"; ctx.fillStyle = "#3d2010";
-    ctx.fillText("Music Together", 124, 72);
-
-    // Divider line
-    ctx.beginPath(); ctx.moveTo(60, 110); ctx.lineTo(540, 110);
-    ctx.strokeStyle = "rgba(192,112,128,0.2)"; ctx.lineWidth = 1; ctx.stroke();
-
-    // Room code
-    ctx.textAlign = "center";
-    ctx.font = "16px system-ui"; ctx.fillStyle = "rgba(100,60,40,0.5)";
-    ctx.fillText("MÃ PHÒNG", 300, 160);
-    ctx.font = "bold 72px monospace"; ctx.fillStyle = "#c07080";
-    ctx.letterSpacing = "0.3em";
-    ctx.fillText(roomId, 300, 240);
-    ctx.letterSpacing = "0";
-
-    // Host info
-    ctx.font = "16px system-ui"; ctx.fillStyle = "rgba(100,60,40,0.55)";
-    ctx.fillText(`Tạo bởi ${hostName}`, 300, 280);
-
-    // Join link
-    ctx.font = "13px monospace"; ctx.fillStyle = "rgba(100,60,40,0.4)";
-    ctx.fillText(`${window.location.origin}/room/${roomId}`, 300, 345);
-
-    // Border
-    ctx.strokeStyle = "rgba(192,112,128,0.25)"; ctx.lineWidth = 2;
-    ctx.roundRect(8, 8, 584, 364, 20); ctx.stroke();
-
-    setDrawn(true);
-  }, [roomId, hostName]);
-
-  const download = () => {
-    const a = document.createElement("a");
-    a.href = canvasRef.current!.toDataURL("image/png");
-    a.download = `music-together-${roomId}.png`;
-    a.click();
+  const share = async () => {
+    const text = `🎵 Cùng nghe nhạc tại phòng của ${hostName}!\nMã phòng: ${roomId}\n${joinUrl}`;
+    if (navigator.share) {
+      try { await navigator.share({ title: "Music Together", text, url: joinUrl }); setShared(true); setTimeout(() => setShared(false), 2000); }
+      catch { /* cancelled */ }
+    } else {
+      await navigator.clipboard.writeText(text);
+      setShared(true); setTimeout(() => setShared(false), 2000);
+    }
   };
 
   return (
     <ModalBase title="Bưu thiếp phòng" onClose={onClose}>
-      <p className="text-sm text-muted-foreground mb-4">Tải về và chia sẻ bưu thiếp phòng này với bạn bè</p>
-      <div className="rounded-2xl overflow-hidden border border-primary/10 shadow-sm">
-        <canvas ref={canvasRef} className="w-full h-auto" />
+      {/* ── Card ── */}
+      <div ref={cardRef}
+        style={{ background: "#fdf6f0", fontFamily: "serif" }}
+        className="rounded-2xl border border-rose-200 overflow-hidden shadow-sm">
+        {/* header */}
+        <div className="px-5 pt-5 pb-3">
+          <p style={{ color: "#c07080", fontSize: 13, fontWeight: 700, letterSpacing: 1 }}>Music Together</p>
+          <p style={{ fontSize: 22, fontWeight: 700, color: "#2d1010", marginTop: 2 }}>{hostName}</p>
+        </div>
+        {/* body */}
+        <div className="px-5 pb-5 flex gap-4 items-start">
+          {/* left info */}
+          <div className="flex-1 min-w-0 flex flex-col gap-3">
+            <div>
+              <p style={{ color: "#c07080", fontSize: 11, fontWeight: 700, letterSpacing: 1 }}>♫ ĐANG PHÁT</p>
+              <p style={{ fontSize: 15, fontWeight: 700, color: "#2d1010", marginTop: 2, lineHeight: 1.3 }} className="line-clamp-2">
+                {currentTrack ? currentTrack.title : "Chưa có bài nào"}
+              </p>
+            </div>
+            <div>
+              <p style={{ color: "#6b3030", fontSize: 13 }}>{listeners.length} người nghe</p>
+              <div style={{ marginTop: 2 }}>
+                {listeners.slice(0, 5).map(l => (
+                  <p key={l} style={{ color: "#6b3030", fontSize: 13 }}>{l}</p>
+                ))}
+                {listeners.length > 5 && <p style={{ color: "#a07080", fontSize: 12 }}>+{listeners.length - 5} người khác</p>}
+              </div>
+            </div>
+            <div>
+              <p style={{ color: "#c07080", fontSize: 13, fontWeight: 700 }}>Mã phòng: {roomId}</p>
+              <p style={{ color: "#a07080", fontSize: 11, marginTop: 1, wordBreak: "break-all" }}>{joinUrl}</p>
+            </div>
+          </div>
+          {/* QR code */}
+          <div className="flex flex-col items-center gap-1 flex-shrink-0">
+            <img src={qrUrl} alt="QR" width={110} height={110}
+              style={{ borderRadius: 8, border: "1px solid rgba(192,112,128,0.2)" }} />
+            <p style={{ color: "#a07080", fontSize: 10 }}>Scan to join</p>
+          </div>
+        </div>
+        {/* footer */}
+        <div style={{ background: "rgba(192,112,128,0.06)", borderTop: "1px solid rgba(192,112,128,0.15)" }}
+          className="px-5 py-3">
+          <p style={{ color: "#a07080", fontSize: 11 }}>Made with Music Together ♫ Cùng nghe nhạc, mọi lúc mọi nơi</p>
+        </div>
       </div>
-      {drawn && (
-        <button onClick={download}
-          className="mt-4 w-full flex items-center justify-center gap-2 py-3 bg-primary text-white rounded-2xl font-medium hover:bg-primary/90 transition-colors">
-          <Download className="w-4 h-4" /> Tải về
+
+      {/* ── Action buttons ── */}
+      <div className="mt-4 flex gap-3">
+        <button onClick={download} disabled={downloading}
+          className="flex-1 flex items-center justify-center gap-2 py-3 bg-background border border-primary/20 text-foreground rounded-2xl font-medium text-sm hover:bg-primary/5 transition-colors disabled:opacity-60">
+          <Download className="w-4 h-4" />
+          {downloading ? "Đang tải..." : "Tải xuống"}
         </button>
-      )}
+        <button onClick={share}
+          className="flex-1 flex items-center justify-center gap-2 py-3 bg-primary text-white rounded-2xl font-medium text-sm hover:bg-primary/90 transition-colors">
+          {shared ? <><Check className="w-4 h-4" /> Đã chia sẻ!</> : <><Share2 className="w-4 h-4" /> Chia sẻ</>}
+        </button>
+      </div>
     </ModalBase>
   );
 }
@@ -625,7 +641,7 @@ export default function Room() {
 
       {/* ── Modals ──────────────────────────── */}
       {shareOpen    && <ShareModal    roomId={roomId} onClose={() => setShareOpen(false)} />}
-      {postcardOpen && <PostcardModal roomId={roomId} hostName={roomState?.hostName ?? ""} onClose={() => setPostcardOpen(false)} />}
+      {postcardOpen && <PostcardModal roomId={roomId} hostName={roomState?.hostName ?? ""} currentTrack={roomState?.currentTrack ?? null} listeners={roomState?.listeners ?? []} onClose={() => setPostcardOpen(false)} />}
       {themeOpen    && <ThemeModal    currentTheme={themeId} onSelect={setThemeId} onClose={() => setThemeOpen(false)} />}
       {settingsOpen && <SettingsModal roomId={roomId} hostName={roomState?.hostName ?? ""} listeners={roomState?.listeners ?? []} onClose={() => setSettingsOpen(false)} />}
       {donateOpen   && <DonateModal   onClose={() => setDonateOpen(false)} />}
