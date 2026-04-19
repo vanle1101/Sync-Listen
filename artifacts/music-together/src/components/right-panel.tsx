@@ -140,6 +140,9 @@ interface RightPanelProps {
   onAddTrack: (t: Track) => void;
   onRemoveTrack: (i: number) => void;
   onPlayTrack: (i: number) => void;
+  onRemoveCurrent: () => void;
+  onRemovePlayed: (i: number) => void;
+  onReplayPlayed: (i: number) => void;
   onSendMessage: (text: string) => void;
   activities: Activity[];
 }
@@ -148,7 +151,7 @@ interface RightPanelProps {
 export function RightPanel({
   playlist, playedTracks, currentTrack, chatMessages, isHost, currentUser,
   myAvatarUrl, userAvatars,
-  onAddTrack, onRemoveTrack, onPlayTrack, onSendMessage, activities,
+  onAddTrack, onRemoveTrack, onPlayTrack, onRemoveCurrent, onRemovePlayed, onReplayPlayed, onSendMessage, activities,
 }: RightPanelProps) {
   const [tab, setTab] = useState<"playlist" | "chat">("playlist");
   const [unreadChat, setUnreadChat] = useState(0);
@@ -192,16 +195,17 @@ export function RightPanel({
 
       {/* ── Tab content ── */}
       {tab === "playlist"
-        ? <PlaylistTab playlist={playlist} playedTracks={playedTracks} currentTrack={currentTrack} isHost={isHost} onAddTrack={onAddTrack} onRemoveTrack={onRemoveTrack} onPlayTrack={onPlayTrack} />
+        ? <PlaylistTab playlist={playlist} playedTracks={playedTracks} currentTrack={currentTrack} isHost={isHost} onAddTrack={onAddTrack} onRemoveTrack={onRemoveTrack} onPlayTrack={onPlayTrack} onRemoveCurrent={onRemoveCurrent} onRemovePlayed={onRemovePlayed} onReplayPlayed={onReplayPlayed} />
         : <ChatTab messages={chatMessages} currentUser={currentUser} myAvatarUrl={myAvatarUrl} userAvatars={userAvatars} onSendMessage={onSendMessage} />}
     </div>
   );
 }
 
 /* ─── Playlist Tab ──────────────────────────────────── */
-function PlaylistTab({ playlist, playedTracks, currentTrack, isHost, onAddTrack, onRemoveTrack, onPlayTrack }: {
+function PlaylistTab({ playlist, playedTracks, currentTrack, isHost, onAddTrack, onRemoveTrack, onPlayTrack, onRemoveCurrent, onRemovePlayed, onReplayPlayed }: {
   playlist: Track[]; playedTracks: Track[]; currentTrack: Track | null; isHost: boolean;
   onAddTrack: (t: Track) => void; onRemoveTrack: (i: number) => void; onPlayTrack: (i: number) => void;
+  onRemoveCurrent: () => void; onRemovePlayed: (i: number) => void; onReplayPlayed: (i: number) => void;
 }) {
   const [query, setQuery] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
@@ -366,9 +370,10 @@ function PlaylistTab({ playlist, playedTracks, currentTrack, isHost, onAddTrack,
                     <span className="flex-1 h-px bg-muted-foreground/15 rounded" />Đã phát<span className="flex-1 h-px bg-muted-foreground/15 rounded" />
                   </p>
                   {playedTracks.map((track, i) => (
-                    <div key={`played-${track.videoId}-${i}`} className="flex items-center gap-2.5 p-2.5 rounded-2xl opacity-40">
-                      <div className="relative w-12 h-10 rounded-xl overflow-hidden flex-shrink-0">
-                        <img src={track.thumbnail} alt="" className="w-full h-full object-cover grayscale" />
+                    <div key={`played-${track.videoId}-${i}`}
+                      className="group flex items-center gap-2.5 p-2.5 rounded-2xl hover:bg-white/60 hover:opacity-100 opacity-50 transition-all">
+                      <div className="relative w-12 h-10 rounded-xl overflow-hidden flex-shrink-0 shrink-0">
+                        <img src={track.thumbnail} alt="" className="w-full h-full object-cover grayscale group-hover:grayscale-0 transition-all" />
                         <div className="absolute inset-0 bg-black/20 flex items-center justify-center">
                           <Check className="w-4 h-4 text-white drop-shadow" />
                         </div>
@@ -377,13 +382,27 @@ function PlaylistTab({ playlist, playedTracks, currentTrack, isHost, onAddTrack,
                         <p className="text-xs font-medium text-foreground/70 line-clamp-1">{track.title}</p>
                         <p className="text-[10px] text-muted-foreground/50">{track.channelTitle}</p>
                       </div>
+                      {isHost && (
+                        <div className="flex items-center gap-1 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
+                          <button onClick={() => onReplayPlayed(i)}
+                            className="w-7 h-7 rounded-xl text-primary/60 hover:text-white hover:bg-primary flex items-center justify-center transition-all"
+                            title="Phát lại">
+                            <Play className="w-3.5 h-3.5 fill-current" />
+                          </button>
+                          <button onClick={() => onRemovePlayed(i)}
+                            className="w-7 h-7 rounded-xl text-muted-foreground/40 hover:text-red-500 hover:bg-red-50 flex items-center justify-center transition-all"
+                            title="Xóa khỏi lịch sử">
+                            <X className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      )}
                     </div>
                   ))}
                   {currentTrack && <div className="h-px bg-primary/10 mx-1" />}
                 </>
               )}
               {currentTrack && (
-                <div className="flex items-center gap-2.5 p-2.5 rounded-2xl bg-primary/5 border border-primary/20">
+                <div className="group flex items-center gap-2.5 p-2.5 rounded-2xl bg-primary/5 border border-primary/20">
                   <div className="relative w-12 h-10 rounded-xl overflow-hidden flex-shrink-0">
                     <img src={currentTrack.thumbnail} alt="" className="w-full h-full object-cover" />
                     <div className="absolute inset-0 bg-primary/25 flex items-center justify-center">
@@ -399,6 +418,13 @@ function PlaylistTab({ playlist, playedTracks, currentTrack, isHost, onAddTrack,
                     <p className="text-xs font-semibold text-primary line-clamp-1">{currentTrack.title}</p>
                     <p className="text-[10px] text-muted-foreground/60">{currentTrack.channelTitle}</p>
                   </div>
+                  {isHost && (
+                    <button onClick={onRemoveCurrent}
+                      className="w-7 h-7 rounded-xl text-muted-foreground/30 hover:text-red-500 hover:bg-red-50 flex items-center justify-center transition-all shrink-0 opacity-0 group-hover:opacity-100"
+                      title="Bỏ qua bài này">
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  )}
                 </div>
               )}
               {playlist.length > 0 && (

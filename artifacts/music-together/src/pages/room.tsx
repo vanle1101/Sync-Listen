@@ -648,6 +648,9 @@ export default function Room() {
   };
   const handleRemoveTrack = (i: number) => sendAction({ type: "remove_track", index: i });
   const handlePlayTrack = (i: number) => sendAction({ type: "play_track", index: i });
+  const handleRemoveCurrent = () => sendAction({ type: "remove_current" });
+  const handleRemovePlayed = (i: number) => sendAction({ type: "remove_played", index: i });
+  const handleReplayPlayed = (i: number) => sendAction({ type: "replay_played", index: i });
   const handleSeek = (time: number) => sendAction({ type: "seek", currentTime: time });
   const handlePlayPause = () => {
     if (!roomState) return;
@@ -847,6 +850,9 @@ export default function Room() {
             onAddTrack={handleAddTrack}
             onRemoveTrack={handleRemoveTrack}
             onPlayTrack={handlePlayTrack}
+            onRemoveCurrent={handleRemoveCurrent}
+            onRemovePlayed={handleRemovePlayed}
+            onReplayPlayed={handleReplayPlayed}
             onSendMessage={handleSendMessage}
             activities={activities}
           />

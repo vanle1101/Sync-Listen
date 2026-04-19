@@ -125,6 +125,46 @@ export function setupWebSocketServer(server: http.Server): void {
           break;
         }
 
+        case "remove_current": {
+          if (!canControl) { sendToSocket(ws, { type: "error", message: "Only host" }); break; }
+          if (!room.currentTrack) break;
+          // Discard current track, move to next without adding to history
+          if (room.playlist.length > 0) {
+            room.currentTrack = pickNextTrack(room)!;
+            room.playing = true;
+            room.currentTime = 0;
+          } else {
+            room.currentTrack = null;
+            room.playing = false;
+            room.currentTime = 0;
+          }
+          broadcastFullState(currentRoomId, room);
+          break;
+        }
+
+        case "remove_played": {
+          if (!canControl) { sendToSocket(ws, { type: "error", message: "Only host" }); break; }
+          const pi = msg.index as number;
+          if (typeof pi !== "number" || pi < 0 || pi >= room.playedTracks.length) break;
+          room.playedTracks.splice(pi, 1);
+          broadcast(currentRoomId, { type: "playlist_update", playlist: room.playlist, playedTracks: room.playedTracks });
+          break;
+        }
+
+        case "replay_played": {
+          if (!canControl) { sendToSocket(ws, { type: "error", message: "Only host" }); break; }
+          const ri = msg.index as number;
+          if (typeof ri !== "number" || ri < 0 || ri >= room.playedTracks.length) break;
+          const [replayTrack] = room.playedTracks.splice(ri, 1);
+          // Push current to front of queue, set replayed track as current
+          if (room.currentTrack) room.playlist.unshift(room.currentTrack);
+          room.currentTrack = replayTrack;
+          room.playing = true;
+          room.currentTime = 0;
+          broadcastFullState(currentRoomId, room);
+          break;
+        }
+
         case "play_pause": {
           if (!canControl) { sendToSocket(ws, { type: "error", message: "Only host" }); break; }
           if (!room.currentTrack && room.playlist.length > 0) {
