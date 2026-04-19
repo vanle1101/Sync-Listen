@@ -401,11 +401,13 @@ function SettingsModal({
   roomId, hostName, roomName: initialRoomName, listeners, isHost,
   themeId, onSelectTheme,
   onRenameRoom,
+  onCloseRoom,
   onClose,
 }: {
   roomId: string; hostName: string; roomName: string; listeners: string[];
   isHost: boolean; themeId: string; onSelectTheme: (id: string) => void;
   onRenameRoom: (name: string) => void;
+  onCloseRoom: () => void;
   onClose: () => void;
 }) {
   const [, setLocation] = useLocation();
@@ -429,8 +431,7 @@ function SettingsModal({
 
   const handleCloseRoom = () => {
     if (!closeConfirm) { setCloseConfirm(true); return; }
-    toast({ title: "Phòng đã đóng", description: "Tạm biệt nhé!" });
-    setLocation("/");
+    onCloseRoom(); // sends WS close_room → server broadcasts room_closed → all clients navigate away
   };
 
   const SectionLabel = ({ children }: { children: React.ReactNode }) => (
@@ -718,7 +719,7 @@ export default function Room() {
     query: { enabled: !!roomId, queryKey: getGetRoomQueryKey(roomId) }
   });
 
-  const { roomState, connected, sendAction } = useWebSocket(roomId, userName, myAvatarUrl || null);
+  const { roomState, connected, sendAction, roomClosed } = useWebSocket(roomId, userName, myAvatarUrl || null);
 
   const prevListenersRef = useRef<string[]>([]);
   useEffect(() => {
@@ -747,6 +748,20 @@ export default function Room() {
   useEffect(() => {
     if (roomError) { toast({ title: "Phòng không tìm thấy", variant: "destructive" }); setLocation("/"); }
   }, [roomError, setLocation, toast]);
+
+  useEffect(() => {
+    if (!roomClosed) return;
+    // Remove from recent rooms
+    try {
+      const raw = localStorage.getItem("music-together-rooms");
+      if (raw) {
+        const rooms = JSON.parse(raw).filter((r: { id: string }) => r.id !== roomId);
+        localStorage.setItem("music-together-rooms", JSON.stringify(rooms));
+      }
+    } catch {}
+    toast({ title: "Phòng đã đóng", description: "Tạm biệt nhé! 👋" });
+    setLocation("/");
+  }, [roomClosed, roomId, setLocation, toast]);
 
   const isRealHost = roomState?.hostName === userName;
   const isHost = hostActive && isRealHost;
@@ -1133,7 +1148,7 @@ export default function Room() {
       {shareOpen    && <ShareModal    roomId={roomId} onClose={() => setShareOpen(false)} />}
       {postcardOpen && <PostcardModal roomId={roomId} hostName={roomState?.hostName ?? ""} currentTrack={roomState?.currentTrack ?? null} listeners={roomState?.listeners ?? []} onClose={() => setPostcardOpen(false)} />}
       {themeOpen    && <ThemeModal    currentTheme={themeId} onSelect={setThemeId} bgImageUrl={bgImageUrl} onSetBgImage={handleSetBgImage} onClose={() => setThemeOpen(false)} />}
-      {settingsOpen && <SettingsModal roomId={roomId} hostName={roomState?.hostName ?? ""} roomName={roomState?.roomName ?? ""} listeners={roomState?.listeners ?? []} isHost={isHost} themeId={themeId} onSelectTheme={setThemeId} onRenameRoom={(name) => sendAction({ type: "rename_room", roomName: name })} onClose={() => setSettingsOpen(false)} />}
+      {settingsOpen && <SettingsModal roomId={roomId} hostName={roomState?.hostName ?? ""} roomName={roomState?.roomName ?? ""} listeners={roomState?.listeners ?? []} isHost={isHost} themeId={themeId} onSelectTheme={setThemeId} onRenameRoom={(name) => sendAction({ type: "rename_room", roomName: name })} onCloseRoom={() => sendAction({ type: "close_room" })} onClose={() => setSettingsOpen(false)} />}
       {donateOpen   && <DonateModal   onClose={() => setDonateOpen(false)} />}
     </div>
   );

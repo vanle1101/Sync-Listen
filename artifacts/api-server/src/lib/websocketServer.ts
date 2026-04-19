@@ -7,6 +7,7 @@ import {
   removeListener,
   broadcast,
   sendToSocket,
+  deleteRoom,
   pickNextTrack,
   type Track,
 } from "./roomManager";
@@ -115,6 +116,15 @@ export function setupWebSocketServer(server: http.Server): void {
           room.roomName = newRoomName;
           db.update(roomsTable).set({ roomName: newRoomName }).where(eq(roomsTable.id, currentRoomId)).catch(() => {});
           broadcast(currentRoomId, { type: "room_renamed", roomName: newRoomName });
+          break;
+        }
+
+        case "close_room": {
+          if (!isHost) { sendToSocket(ws, { type: "error", message: "Only host" }); break; }
+          broadcast(currentRoomId, { type: "room_closed" });
+          db.delete(roomsTable).where(eq(roomsTable.id, currentRoomId)).catch(() => {});
+          deleteRoom(currentRoomId);
+          logger.info({ roomId: currentRoomId }, "Room closed by host");
           break;
         }
 

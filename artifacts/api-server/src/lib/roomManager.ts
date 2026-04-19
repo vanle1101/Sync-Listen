@@ -110,6 +110,11 @@ export function broadcast(roomId: string, message: object, exclude?: WebSocket):
   }
 }
 
+export function deleteRoom(roomId: string): void {
+  rooms.delete(roomId);
+  roomListeners.delete(roomId);
+}
+
 export function sendToSocket(ws: WebSocket, message: object): void {
   if (ws.readyState === WebSocket.OPEN) {
     ws.send(JSON.stringify(message));

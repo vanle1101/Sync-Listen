@@ -6,6 +6,7 @@ export function useWebSocket(roomId: string, userName: string | null, avatarUrl?
   const [roomState, setRoomState] = useState<RoomState | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [connected, setConnected] = useState(false);
+  const [roomClosed, setRoomClosed] = useState(false);
   const reconnectTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pendingActions = useRef<any[]>([]);
   const mountedRef = useRef(true);
@@ -100,6 +101,9 @@ export function useWebSocket(roomId: string, userName: string | null, avatarUrl?
             case "room_renamed":
               setRoomState(prev => prev ? { ...prev, roomName: msg.roomName as string } : null);
               break;
+            case "room_closed":
+              setRoomClosed(true);
+              break;
             case "listeners_update":
               setRoomState(prev => prev ? {
                 ...prev,
@@ -143,5 +147,5 @@ export function useWebSocket(roomId: string, userName: string | null, avatarUrl?
     };
   }, [roomId, userName]);
 
-  return { roomState, connected, error, sendAction };
+  return { roomState, connected, error, sendAction, roomClosed };
 }

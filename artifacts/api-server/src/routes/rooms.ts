@@ -50,6 +50,13 @@ router.get("/rooms/:roomId", async (req, res): Promise<void> => {
   res.json(GetRoomResponse.parse({ ...room, createdAt: room.createdAt.toISOString() }));
 });
 
+router.delete("/rooms/:roomId", async (req, res): Promise<void> => {
+  const rawId = Array.isArray(req.params.roomId) ? req.params.roomId[0] : req.params.roomId;
+  if (!rawId) { res.status(400).json({ error: "Missing roomId" }); return; }
+  await db.delete(roomsTable).where(eq(roomsTable.id, rawId));
+  res.status(204).send();
+});
+
 router.get("/rooms/:roomId/streak", async (req, res): Promise<void> => {
   const roomId = Array.isArray(req.params.roomId) ? req.params.roomId[0] : req.params.roomId;
   if (!roomId) { res.status(400).json({ error: "Missing roomId" }); return; }
