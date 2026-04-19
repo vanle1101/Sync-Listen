@@ -197,9 +197,8 @@ export default function Room() {
         <div className="absolute bottom-0 left-0 w-[30%] h-[30%] bg-secondary/5 rounded-full blur-[100px] pointer-events-none -z-10"></div>
         
         {/* Left Column: Player & Controls */}
-        <div className="flex-1 flex flex-col gap-4 min-w-0 max-w-5xl mx-auto w-full min-h-0 overflow-hidden">
-          {/* Player: capped height so panels below are always visible */}
-          <div className="w-full shrink-0" style={{ maxHeight: '240px', overflow: 'hidden', borderRadius: '2rem' }}>
+        <div className="flex-1 flex flex-col gap-6 min-w-0 max-w-5xl mx-auto w-full overflow-y-auto min-h-0">
+          <div className="w-full">
             <YoutubePlayer 
               currentTrack={roomState?.currentTrack || null}
               playing={roomState?.playing || false}
@@ -210,9 +209,7 @@ export default function Room() {
               onTrackEnd={handleTrackEnd}
               onTimeUpdate={handleTimeUpdate}
             />
-          </div>
-          
-          <div className="shrink-0">
+            
             <PlayerControls 
               isHost={isHost}
               playing={roomState?.playing || false}
@@ -227,9 +224,8 @@ export default function Room() {
             />
           </div>
           
-          {/* Queue + Search — always side by side, fixed height, independent scroll */}
-          <div className="flex flex-row gap-4 min-h-0 flex-1">
-            <div className="flex-1 min-h-0 min-w-0">
+          <div className="flex-1 min-h-[400px] flex flex-col md:flex-row gap-6">
+            <div className="flex-1 min-h-[400px] h-full">
               <PlaylistPanel 
                 playlist={roomState?.playlist || []}
                 currentTrack={roomState?.currentTrack || null}
@@ -238,7 +234,7 @@ export default function Room() {
                 isHost={isHost}
               />
             </div>
-            <div className="flex-1 min-h-0 min-w-0">
+            <div className="flex-1 min-h-[400px] h-full">
               <SearchPanel onAddTrack={handleAddTrack} />
             </div>
           </div>

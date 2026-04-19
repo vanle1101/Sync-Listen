@@ -34,7 +34,7 @@ export function PlayerControls({
   const progress = duration > 0 ? (displayTime / duration) * 100 : 0;
 
   return (
-    <div className="bg-white/60 backdrop-blur-xl border border-primary/5 p-5 rounded-3xl shadow-[0_10px_40px_rgba(192,112,128,0.12)] soft-glow space-y-3">
+    <div className="bg-white/60 backdrop-blur-xl border border-primary/5 p-5 rounded-3xl shadow-[0_10px_40px_rgba(192,112,128,0.12)] mt-4 soft-glow space-y-3">
 
       {/* Seek bar row */}
       <div className="flex items-center gap-3">
