@@ -29,6 +29,10 @@ A collaborative music listening web app — create or join rooms to listen to Yo
 - Shared playlist — anyone can add/remove tracks
 - Real-time chat inside the room
 - Live listener list
+- Democracy mode (all members control playback, not just host)
+- Google login via Clerk Auth — auto-fills name + avatar from Google profile
+
+**Auth:** Clerk (`@clerk/react` + `@clerk/express`) with Google social login. `VITE_CLERK_PUBLISHABLE_KEY` written to `artifacts/music-together/.env` (publishable key, safe to commit). Proxy mounted at `/__clerk` in Express. Sign-in/sign-up pages at `/sign-in` and `/sign-up`. Guests can still use the app without logging in (manual name entry).
 
 **Frontend:** React + Vite at `artifacts/music-together/`
 **Backend:** Express 5 API + WebSocket server at `artifacts/api-server/`

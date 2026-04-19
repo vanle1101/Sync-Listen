@@ -3,6 +3,7 @@ import { useParams, useLocation } from "wouter";
 import { useWebSocket } from "@/hooks/use-websocket";
 import { Track } from "@/lib/types";
 import { useToast } from "@/hooks/use-toast";
+import { useUser } from "@clerk/react";
 import { Button } from "@/components/ui/button";
 import { YoutubePlayer } from "@/components/youtube-player";
 import { PlayerControls } from "@/components/player-controls";
@@ -555,6 +556,7 @@ export default function Room() {
   const roomId = params.roomId as string;
   const [, setLocation] = useLocation();
   const { toast } = useToast();
+  const { user, isLoaded: clerkLoaded } = useUser();
 
   const [userName, setUserName] = useState<string | null>(null);
   const [volume, setVolume] = useState(80);
@@ -593,12 +595,21 @@ export default function Room() {
   const [myAvatarUrl, setMyAvatarUrl] = useState<string>("");
 
   useEffect(() => {
-    const name = sessionStorage.getItem("music-together-name");
-    if (!name) { setLocation("/"); return; }
-    setUserName(name);
-    const av = sessionStorage.getItem("music-together-avatar");
-    if (av) setMyAvatarUrl(av);
-  }, [setLocation]);
+    if (!clerkLoaded) return;
+    if (user) {
+      // Signed in with Clerk — use their name and avatar
+      const clerkName = [user.firstName, user.lastName].filter(Boolean).join(" ") || user.emailAddresses[0]?.emailAddress || "Khách";
+      setUserName(clerkName);
+      if (user.imageUrl) setMyAvatarUrl(user.imageUrl);
+    } else {
+      // Guest — read from sessionStorage
+      const name = sessionStorage.getItem("music-together-name");
+      if (!name) { setLocation("/"); return; }
+      setUserName(name);
+      const av = sessionStorage.getItem("music-together-avatar");
+      if (av) setMyAvatarUrl(av);
+    }
+  }, [clerkLoaded, user, setLocation]);
 
   const { data: _roomInfo, isLoading: isLoadingRoom, error: roomError } = useGetRoom(roomId, {
     query: { enabled: !!roomId, queryKey: getGetRoomQueryKey(roomId) }
@@ -655,7 +666,7 @@ export default function Room() {
   const handleSendMessage = (text: string) => sendAction({ type: "chat", text });
   const handleLeave = () => { sessionStorage.removeItem("music-together-name"); setLocation("/"); };
 
-  if (isLoadingRoom || !userName) return (
+  if (!clerkLoaded || isLoadingRoom || !userName) return (
     <div className="min-h-screen w-full flex items-center justify-center bg-background">
       <Loader2 className="w-8 h-8 animate-spin text-primary" />
     </div>

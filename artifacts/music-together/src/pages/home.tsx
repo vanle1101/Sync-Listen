@@ -5,20 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Loader2, Music, Clock, ArrowRight, X, Camera, LogOut } from "lucide-react";
-
-declare global {
-  interface Window {
-    google?: {
-      accounts: {
-        id: {
-          initialize: (cfg: object) => void;
-          renderButton: (el: HTMLElement, opts: object) => void;
-          prompt: () => void;
-        };
-      };
-    };
-  }
-}
+import { useUser, useClerk } from "@clerk/react";
 
 interface RecentRoom {
   id: string;
@@ -26,68 +13,45 @@ interface RecentRoom {
   visitedAt: number;
 }
 
-interface UserProfile {
+interface ManualProfile {
   name: string;
   avatarUrl?: string;
-  source?: "google" | "manual";
 }
 
-const PROFILE_KEY = "music-together-profile";
+const MANUAL_KEY = "music-together-manual-profile";
 
-function loadProfile(): UserProfile | null {
-  try {
-    const raw = localStorage.getItem(PROFILE_KEY);
-    return raw ? JSON.parse(raw) : null;
-  } catch { return null; }
+function loadManualProfile(): ManualProfile | null {
+  try { return JSON.parse(localStorage.getItem(MANUAL_KEY) ?? "null"); } catch { return null; }
 }
 
-function saveProfile(profile: UserProfile) {
-  localStorage.setItem(PROFILE_KEY, JSON.stringify(profile));
-  sessionStorage.setItem("music-together-name", profile.name);
-  if (profile.avatarUrl) sessionStorage.setItem("music-together-avatar", profile.avatarUrl);
+function saveManualProfile(p: ManualProfile) {
+  localStorage.setItem(MANUAL_KEY, JSON.stringify(p));
 }
 
 function getRecentRooms(): RecentRoom[] {
-  try {
-    const raw = localStorage.getItem("music-together-rooms");
-    return raw ? JSON.parse(raw) : [];
-  } catch { return []; }
+  try { return JSON.parse(localStorage.getItem("music-together-rooms") ?? "[]"); } catch { return []; }
 }
 
 function timeAgo(ts: number): string {
   const diff = Date.now() - ts;
-  const minutes = Math.floor(diff / 60000);
-  if (minutes < 1) return "vừa xong";
-  if (minutes < 60) return `${minutes} phút trước`;
-  const hours = Math.floor(minutes / 60);
-  if (hours < 24) return `${hours} giờ trước`;
-  return `${Math.floor(hours / 24)} ngày trước`;
-}
-
-function decodeGoogleJwt(token: string): { name: string; picture: string; email: string } | null {
-  try {
-    const parts = token.split(".");
-    const payload = JSON.parse(atob(parts[1].replace(/-/g, "+").replace(/_/g, "/")));
-    return { name: payload.name, picture: payload.picture, email: payload.email };
-  } catch { return null; }
+  const min = Math.floor(diff / 60000);
+  if (min < 1) return "vừa xong";
+  if (min < 60) return `${min} phút trước`;
+  const h = Math.floor(min / 60);
+  if (h < 24) return `${h} giờ trước`;
+  return `${Math.floor(h / 24)} ngày trước`;
 }
 
 function AvatarCircle({ url, name, size = 88, onClick }: { url?: string; name: string; size?: number; onClick?: () => void }) {
   const initial = name.trim()[0]?.toUpperCase() || "?";
   return (
-    <button
-      type="button"
-      onClick={onClick}
+    <button type="button" onClick={onClick}
       className="relative group rounded-full focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
-      style={{ width: size, height: size }}
-      title="Đổi ảnh đại diện"
-    >
+      style={{ width: size, height: size }} title={onClick ? "Đổi ảnh đại diện" : undefined}>
       <div className="w-full h-full rounded-full overflow-hidden border-2 border-primary/20 shadow-md bg-gradient-to-br from-primary/10 to-secondary/20 flex items-center justify-center transition-all group-hover:border-primary/50">
-        {url ? (
-          <img src={url} alt={name} className="w-full h-full object-cover" onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }} />
-        ) : (
-          <span className="font-serif italic font-bold text-primary/60" style={{ fontSize: size * 0.38 }}>{initial}</span>
-        )}
+        {url
+          ? <img src={url} alt={name} className="w-full h-full object-cover" onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }} />
+          : <span className="font-serif italic font-bold text-primary/60" style={{ fontSize: size * 0.38 }}>{initial}</span>}
       </div>
       {onClick && (
         <div className="absolute inset-0 rounded-full bg-black/30 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
@@ -100,122 +64,88 @@ function AvatarCircle({ url, name, size = 88, onClick }: { url?: string; name: s
 
 export default function Home() {
   const [, setLocation] = useLocation();
+  const { user, isLoaded } = useUser();
+  const { signOut } = useClerk();
+
+  /* ── Name & avatar ── */
+  const isSignedIn = isLoaded && !!user;
+  const clerkName = user ? [user.firstName, user.lastName].filter(Boolean).join(" ") : "";
+  const clerkAvatar = user?.imageUrl ?? "";
+
   const [name, setName] = useState("");
-  const [avatarUrl, setAvatarUrl] = useState("");
-  const [avatarSource, setAvatarSource] = useState<"google" | "manual" | undefined>();
+  const [manualAvatar, setManualAvatar] = useState("");
+
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [joinRoomId, setJoinRoomId] = useState("");
   const [recentRooms, setRecentRooms] = useState<RecentRoom[]>([]);
-  const [googleReady, setGoogleReady] = useState(false);
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  const googleBtnRef = useRef<HTMLDivElement>(null);
   const createRoom = useCreateRoom();
-  const clientId = (import.meta as any).env?.VITE_GOOGLE_CLIENT_ID as string | undefined;
 
+  /* Load saved manual profile */
   useEffect(() => {
     setRecentRooms(getRecentRooms());
-    const profile = loadProfile();
-    if (profile) {
-      setName(profile.name);
-      if (profile.avatarUrl) { setAvatarUrl(profile.avatarUrl); setAvatarSource(profile.source); }
-    }
+    const p = loadManualProfile();
+    if (p) { setName(p.name); if (p.avatarUrl) setManualAvatar(p.avatarUrl); }
   }, []);
 
-  // Init Google Identity Services
+  /* When Clerk user loads, set name from Clerk */
   useEffect(() => {
-    if (!clientId) return;
-    const tryInit = () => {
-      if (!window.google) return;
-      window.google.accounts.id.initialize({
-        client_id: clientId,
-        callback: (response: { credential: string }) => {
-          const info = decodeGoogleJwt(response.credential);
-          if (!info) return;
-          setName(info.name);
-          setAvatarUrl(info.picture);
-          setAvatarSource("google");
-          saveProfile({ name: info.name, avatarUrl: info.picture, source: "google" });
-        },
-      });
-      if (googleBtnRef.current) {
-        window.google.accounts.id.renderButton(googleBtnRef.current, {
-          type: "standard",
-          shape: "pill",
-          theme: "outline",
-          text: "signin_with",
-          size: "large",
-          logo_alignment: "left",
-          width: 280,
-          locale: "vi",
-        });
-      }
-      setGoogleReady(true);
-    };
-    // GIS script might not be loaded yet
-    if (window.google) {
-      tryInit();
-    } else {
-      const timer = setInterval(() => {
-        if (window.google) { clearInterval(timer); tryInit(); }
-      }, 200);
-      return () => clearInterval(timer);
-    }
-  }, [clientId]);
+    if (isSignedIn && clerkName) setName(clerkName);
+  }, [isSignedIn, clerkName]);
+
+  const displayName = isSignedIn ? clerkName || name : name;
+  const displayAvatar = isSignedIn ? clerkAvatar : manualAvatar;
 
   const handleAvatarUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (!file) return;
-    if (!file.type.startsWith("image/")) return;
+    if (!file || !file.type.startsWith("image/")) return;
     const reader = new FileReader();
     reader.onload = () => {
       const dataUrl = reader.result as string;
-      setAvatarUrl(dataUrl);
-      setAvatarSource("manual");
-      const profile = loadProfile() ?? { name };
-      saveProfile({ ...profile, name: name || profile.name, avatarUrl: dataUrl, source: "manual" });
+      setManualAvatar(dataUrl);
+      saveManualProfile({ name: name.trim(), avatarUrl: dataUrl });
     };
     reader.readAsDataURL(file);
     e.target.value = "";
   };
 
-  const handleLogoutGoogle = () => {
-    setAvatarUrl("");
-    setAvatarSource(undefined);
-    const profile = loadProfile();
-    if (profile) saveProfile({ ...profile, avatarUrl: undefined, source: undefined });
-  };
-
   const persistAndGo = (roomPath: string) => {
-    saveProfile({ name: name.trim(), avatarUrl: avatarUrl || undefined, source: avatarSource });
+    const finalName = displayName.trim() || "Khách";
+    const finalAvatar = displayAvatar;
+    sessionStorage.setItem("music-together-name", finalName);
+    if (finalAvatar) sessionStorage.setItem("music-together-avatar", finalAvatar);
+    else sessionStorage.removeItem("music-together-avatar");
+    if (!isSignedIn) saveManualProfile({ name: finalName, avatarUrl: manualAvatar || undefined });
     setLocation(roomPath);
   };
 
   const handleCreateRoom = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!name.trim()) return;
-    createRoom.mutate({ data: { hostName: name.trim() } }, {
+    const n = displayName.trim();
+    if (!n) return;
+    createRoom.mutate({ data: { hostName: n } }, {
       onSuccess: (room) => persistAndGo(`/room/${room.id}`),
     });
   };
 
   const handleJoinRoom = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!name.trim() || !joinRoomId.trim()) return;
+    const n = displayName.trim();
     let id = joinRoomId.trim();
+    if (!n || !id) return;
     if (id.includes("/room/")) id = id.split("/room/")[1];
     persistAndGo(`/room/${id}`);
   };
 
   const handleJoinRecent = (room: RecentRoom) => {
-    if (!name.trim()) { setJoinRoomId(room.id); return; }
+    if (!displayName.trim()) { setJoinRoomId(room.id); return; }
     persistAndGo(`/room/${room.id}`);
   };
 
   const handleRemoveRecent = (e: React.MouseEvent, roomId: string) => {
     e.stopPropagation();
     try {
-      const raw = localStorage.getItem("music-together-rooms");
-      const rooms: RecentRoom[] = raw ? JSON.parse(raw) : [];
-      const updated = rooms.filter((r) => r.id !== roomId);
+      const rooms: RecentRoom[] = JSON.parse(localStorage.getItem("music-together-rooms") ?? "[]");
+      const updated = rooms.filter(r => r.id !== roomId);
       localStorage.setItem("music-together-rooms", JSON.stringify(updated));
       setRecentRooms(updated);
     } catch {}
@@ -223,8 +153,8 @@ export default function Home() {
 
   return (
     <div className="min-h-screen w-full flex items-center justify-center p-4 relative overflow-hidden petal-bg">
-      <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-primary/5 rounded-full blur-[100px] pointer-events-none"></div>
-      <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-secondary/5 rounded-full blur-[100px] pointer-events-none"></div>
+      <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-primary/5 rounded-full blur-[100px] pointer-events-none" />
+      <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-secondary/5 rounded-full blur-[100px] pointer-events-none" />
 
       <div className="w-full max-w-5xl grid md:grid-cols-2 gap-12 items-start z-10 relative">
         {/* Left: branding */}
@@ -249,10 +179,8 @@ export default function Home() {
               <div className="space-y-2">
                 {recentRooms.slice(0, 5).map((room) => (
                   <div key={room.id} className="flex items-center gap-2 group">
-                    <button
-                      onClick={() => handleJoinRecent(room)}
-                      className="flex-1 flex items-center justify-between gap-3 bg-white/60 hover:bg-white/90 border border-primary/10 rounded-2xl px-4 py-3 transition-all hover:shadow-sm hover:border-primary/20 group/btn text-left min-w-0"
-                    >
+                    <button onClick={() => handleJoinRecent(room)}
+                      className="flex-1 flex items-center justify-between gap-3 bg-white/60 hover:bg-white/90 border border-primary/10 rounded-2xl px-4 py-3 transition-all hover:shadow-sm hover:border-primary/20 group/btn text-left min-w-0">
                       <div className="flex items-center gap-3 min-w-0">
                         <div className="w-8 h-8 rounded-xl bg-primary/10 flex items-center justify-center flex-shrink-0">
                           <Music className="w-4 h-4 text-primary" />
@@ -264,10 +192,8 @@ export default function Home() {
                       </div>
                       <ArrowRight className="w-4 h-4 text-primary/40 group-hover/btn:text-primary/70 flex-shrink-0 transition-colors" />
                     </button>
-                    <button
-                      onClick={(e) => handleRemoveRecent(e, room.id)}
-                      className="w-7 h-7 rounded-xl flex items-center justify-center text-muted-foreground/30 hover:text-primary/60 hover:bg-primary/5 transition-all opacity-0 group-hover:opacity-100 flex-shrink-0"
-                    >
+                    <button onClick={(e) => handleRemoveRecent(e, room.id)}
+                      className="w-7 h-7 rounded-xl flex items-center justify-center text-muted-foreground/30 hover:text-primary/60 hover:bg-primary/5 transition-all opacity-0 group-hover:opacity-100 flex-shrink-0">
                       <X className="w-3.5 h-3.5" />
                     </button>
                   </div>
@@ -285,55 +211,70 @@ export default function Home() {
           </CardHeader>
 
           <CardContent className="space-y-6">
-            {/* Avatar + Google login section */}
+            {/* Avatar section */}
             <div className="flex flex-col items-center gap-3">
-              <div className="relative">
-                <AvatarCircle url={avatarUrl} name={name || "?"} size={88} onClick={() => fileInputRef.current?.click()} />
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  accept="image/*"
-                  className="hidden"
-                  onChange={handleAvatarUpload}
-                />
-              </div>
-              <p className="text-[11px] text-muted-foreground/50">Nhấn vào ảnh để thay đổi</p>
+              <AvatarCircle
+                url={displayAvatar}
+                name={displayName || "?"}
+                size={88}
+                onClick={isSignedIn ? undefined : () => fileInputRef.current?.click()}
+              />
+              {!isSignedIn && (
+                <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handleAvatarUpload} />
+              )}
 
-              {/* Google login */}
-              {clientId ? (
-                avatarSource === "google" ? (
-                  <div className="flex items-center gap-2 text-xs text-muted-foreground/60 bg-white/60 rounded-2xl px-4 py-2 border border-primary/10">
-                    <svg className="w-4 h-4" viewBox="0 0 24 24">
-                      <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
-                      <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
-                      <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/>
-                      <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
-                    </svg>
-                    Đã đăng nhập với Google
-                    <button onClick={handleLogoutGoogle} className="ml-1 hover:text-primary transition-colors">
-                      <LogOut className="w-3 h-3" />
+              {/* Auth status */}
+              {isLoaded && (
+                isSignedIn ? (
+                  /* Signed-in badge */
+                  <div className="flex items-center gap-2 bg-primary/5 border border-primary/15 rounded-2xl px-4 py-2 text-xs">
+                    <div className="w-2 h-2 bg-green-400 rounded-full" />
+                    <span className="text-foreground/70 font-medium">
+                      {clerkName || user.emailAddresses[0]?.emailAddress}
+                    </span>
+                    <button
+                      onClick={() => signOut()}
+                      title="Đăng xuất"
+                      className="ml-1 text-muted-foreground/40 hover:text-primary transition-colors">
+                      <LogOut className="w-3.5 h-3.5" />
                     </button>
                   </div>
                 ) : (
-                  <div className="flex flex-col items-center gap-2">
-                    <p className="text-[11px] text-muted-foreground/40">hoặc đăng nhập để tự điền thông tin</p>
-                    <div ref={googleBtnRef} className="overflow-hidden rounded-2xl" />
+                  /* Sign-in prompt */
+                  <div className="flex flex-col items-center gap-2 w-full">
+                    <p className="text-[11px] text-muted-foreground/40">hoặc đăng nhập để lưu tài khoản</p>
+                    <button
+                      onClick={() => setLocation("/sign-in")}
+                      className="flex items-center gap-2.5 px-5 py-2.5 bg-white border border-[#e0c8c0] rounded-2xl text-sm font-medium text-foreground/70 hover:bg-[#fdf0ec] hover:border-primary/30 transition-all shadow-sm">
+                      {/* Google icon */}
+                      <svg className="w-4 h-4" viewBox="0 0 24 24">
+                        <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
+                        <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
+                        <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/>
+                        <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
+                      </svg>
+                      Đăng nhập với Google
+                    </button>
                   </div>
                 )
-              ) : null}
+              )}
+
+              {!isSignedIn && <p className="text-[11px] text-muted-foreground/40">Nhấn vào ảnh để thay đổi</p>}
             </div>
 
-            {/* Name input */}
-            <div className="space-y-2">
-              <label className="text-sm font-medium text-muted-foreground pl-1">Tên của bạn</label>
-              <Input
-                placeholder="v.d. Lan Anh"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                className="h-14 bg-white/50 border-primary/10 text-lg rounded-2xl focus-visible:ring-primary/30 transition-all shadow-sm"
-                autoFocus
-              />
-            </div>
+            {/* Name input — hidden when signed in (use Clerk name) */}
+            {!isSignedIn && (
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-muted-foreground pl-1">Tên của bạn</label>
+                <Input
+                  placeholder="v.d. Lan Anh"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  className="h-14 bg-white/50 border-primary/10 text-lg rounded-2xl focus-visible:ring-primary/30 transition-all shadow-sm"
+                  autoFocus
+                />
+              </div>
+            )}
 
             {/* Create room */}
             <div className="space-y-4">
@@ -345,9 +286,8 @@ export default function Home() {
               </div>
               <Button
                 onClick={handleCreateRoom}
-                disabled={!name.trim() || createRoom.isPending}
-                className="w-full h-14 text-lg font-medium rounded-2xl bg-primary hover:bg-primary/90 text-white shadow-[0_8px_20px_rgba(192,112,128,0.28)] transition-all hover:scale-[1.02] active:scale-[0.98]"
-              >
+                disabled={!displayName.trim() || createRoom.isPending}
+                className="w-full h-14 text-lg font-medium rounded-2xl bg-primary hover:bg-primary/90 text-white shadow-[0_8px_20px_rgba(192,112,128,0.28)] transition-all hover:scale-[1.02] active:scale-[0.98]">
                 {createRoom.isPending ? <Loader2 className="w-5 h-5 animate-spin" /> : "Tạo phòng mới"}
               </Button>
             </div>
@@ -369,10 +309,9 @@ export default function Home() {
                 />
                 <Button
                   type="submit"
-                  disabled={!name.trim() || !joinRoomId.trim()}
+                  disabled={!displayName.trim() || !joinRoomId.trim()}
                   variant="secondary"
-                  className="h-14 px-8 rounded-2xl bg-secondary/10 hover:bg-secondary/20 text-secondary font-medium transition-all"
-                >
+                  className="h-14 px-8 rounded-2xl bg-secondary/10 hover:bg-secondary/20 text-secondary font-medium transition-all">
                   Tham gia
                 </Button>
               </form>
