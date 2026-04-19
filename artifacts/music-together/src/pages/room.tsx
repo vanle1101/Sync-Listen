@@ -693,7 +693,7 @@ export default function Room() {
   }, []);
 
   const [myAvatarUrl, setMyAvatarUrl] = useState<string>("");
-  const [streak, setStreak] = useState(0);
+  const [streakData, setStreakData] = useState<{ streak: number; freezesAvailable: number; freezesUsed: number }>({ streak: 0, freezesAvailable: 0, freezesUsed: 0 });
 
   useEffect(() => {
     if (!clerkLoaded) return;
@@ -736,7 +736,7 @@ export default function Room() {
     if (!roomId) return;
     fetch(`/api/rooms/${roomId}/streak`)
       .then(r => r.ok ? r.json() : null)
-      .then(d => { if (d && typeof d.streak === 'number') setStreak(d.streak); })
+      .then(d => { if (d && typeof d.streak === 'number') setStreakData({ streak: d.streak, freezesAvailable: d.freezesAvailable ?? 0, freezesUsed: d.freezesUsed ?? 0 }); })
       .catch(() => {});
   }, [roomId, listenerCount]);
 
@@ -861,11 +861,21 @@ export default function Room() {
                 <span className="text-[10px] font-semibold text-primary">🗳️ Dân chủ</span>
               </>
             )}
-            {streak > 0 && (
+            {streakData.streak > 0 && (
               <>
                 <span className="text-foreground/20">·</span>
                 <span className="text-[10px] font-bold text-orange-500/80 flex items-center gap-0.5">
-                  🔥 {streak} ngày
+                  🔥 {streakData.streak} ngày
+                  {streakData.freezesAvailable > 0 && (
+                    <span className="ml-0.5 text-blue-400/80" title={`${streakData.freezesAvailable} lần khôi phục chuỗi còn lại`}>
+                      🧊×{streakData.freezesAvailable}
+                    </span>
+                  )}
+                  {streakData.freezesUsed > 0 && streakData.freezesAvailable === 0 && (
+                    <span className="ml-0.5 text-blue-300/50" title={`Đã dùng ${streakData.freezesUsed} lần khôi phục`}>
+                      🧊✓
+                    </span>
+                  )}
                 </span>
               </>
             )}

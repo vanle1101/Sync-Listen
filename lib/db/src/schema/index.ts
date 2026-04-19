@@ -19,3 +19,4 @@
 
 export * from "./rooms";
 export * from "./room_sessions";
+export * from "./room_streak_freezes";
