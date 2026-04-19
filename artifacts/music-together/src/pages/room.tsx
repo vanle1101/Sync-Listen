@@ -546,6 +546,7 @@ export default function Room() {
         <div className={`${compact ? 'flex-1' : 'w-[340px] xl:w-[380px]'} flex flex-col min-h-0 shrink-0`}>
           <RightPanel
             playlist={roomState?.playlist || []}
+            playedTracks={roomState?.playedTracks || []}
             currentTrack={roomState?.currentTrack || null}
             chatMessages={roomState?.chatHistory || []}
             isHost={isHost}

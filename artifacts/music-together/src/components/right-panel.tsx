@@ -24,6 +24,7 @@ interface Activity { text: string; time: string; }
 /* ── Props ─────────────────────────────────── */
 interface RightPanelProps {
   playlist: Track[];
+  playedTracks: Track[];
   currentTrack: Track | null;
   chatMessages: ChatMessage[];
   isHost: boolean;
@@ -36,7 +37,7 @@ interface RightPanelProps {
 }
 
 export function RightPanel({
-  playlist, currentTrack, chatMessages, isHost, currentUser,
+  playlist, playedTracks, currentTrack, chatMessages, isHost, currentUser,
   onAddTrack, onRemoveTrack, onPlayTrack, onSendMessage, activities,
 }: RightPanelProps) {
   const [tab, setTab] = useState<"playlist" | "chat" | "notif">("playlist");
@@ -64,7 +65,7 @@ export function RightPanel({
           <Music className="w-3.5 h-3.5" />
           PLAYLIST
           <span className="bg-primary/10 text-primary rounded-full px-1.5 py-0.5 text-[10px] font-bold">
-            {(currentTrack ? 1 : 0) + playlist.length}
+            {playedTracks.length + (currentTrack ? 1 : 0) + playlist.length}
           </span>
         </button>
         <button
@@ -86,7 +87,7 @@ export function RightPanel({
       </div>
 
       {/* Tab content */}
-      {tab === "playlist" && <PlaylistTab playlist={playlist} currentTrack={currentTrack} isHost={isHost} onAddTrack={onAddTrack} onRemoveTrack={onRemoveTrack} onPlayTrack={onPlayTrack} />}
+      {tab === "playlist" && <PlaylistTab playlist={playlist} playedTracks={playedTracks} currentTrack={currentTrack} isHost={isHost} onAddTrack={onAddTrack} onRemoveTrack={onRemoveTrack} onPlayTrack={onPlayTrack} />}
       {tab === "chat" && <ChatTab messages={chatMessages} currentUser={currentUser} onSendMessage={onSendMessage} />}
       {tab === "notif" && <NotifTab activities={activities} soundOn={soundOn} onToggleSound={() => setSoundOn(s => !s)} />}
     </div>
@@ -94,8 +95,8 @@ export function RightPanel({
 }
 
 /* ── Playlist Tab ──────────────────────────── */
-function PlaylistTab({ playlist, currentTrack, isHost, onAddTrack, onRemoveTrack, onPlayTrack }: {
-  playlist: Track[]; currentTrack: Track | null; isHost: boolean;
+function PlaylistTab({ playlist, playedTracks, currentTrack, isHost, onAddTrack, onRemoveTrack, onPlayTrack }: {
+  playlist: Track[]; playedTracks: Track[]; currentTrack: Track | null; isHost: boolean;
   onAddTrack: (t: Track) => void; onRemoveTrack: (i: number) => void; onPlayTrack: (i: number) => void;
 }) {
   const [query, setQuery] = useState("");
@@ -178,7 +179,7 @@ function PlaylistTab({ playlist, currentTrack, isHost, onAddTrack, onRemoveTrack
           ) : null
         ) : (
           /* Queue */
-          !currentTrack && playlist.length === 0 ? (
+          !currentTrack && playlist.length === 0 && playedTracks.length === 0 ? (
             <div className="flex flex-col items-center justify-center text-center py-12 px-4 gap-4">
               <div className="w-20 h-20 rounded-full flex items-center justify-center"
                 style={{ background: 'linear-gradient(135deg, #fdf6f0, #fce8e8)' }}>
@@ -196,6 +197,34 @@ function PlaylistTab({ playlist, currentTrack, isHost, onAddTrack, onRemoveTrack
             </div>
           ) : (
             <div className="space-y-1.5">
+              {/* Played tracks - dimmed */}
+              {playedTracks.length > 0 && (
+                <>
+                  <p className="text-[10px] font-semibold text-muted-foreground/40 uppercase tracking-wider px-1 pt-1 flex items-center gap-1.5">
+                    <span className="flex-1 h-px bg-muted-foreground/15 rounded" />
+                    Đã phát
+                    <span className="flex-1 h-px bg-muted-foreground/15 rounded" />
+                  </p>
+                  {playedTracks.map((track, i) => (
+                    <div key={`played-${track.videoId}-${i}`}
+                      className="flex items-center gap-2.5 p-2.5 rounded-2xl opacity-40">
+                      <div className="relative w-12 h-10 rounded-xl overflow-hidden flex-shrink-0">
+                        <img src={track.thumbnail} alt="" className="w-full h-full object-cover grayscale" />
+                        <div className="absolute inset-0 bg-black/20 flex items-center justify-center">
+                          <Check className="w-4 h-4 text-white drop-shadow" />
+                        </div>
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-xs font-medium text-foreground/70 line-clamp-1 leading-snug">{track.title}</p>
+                        <p className="text-[10px] text-muted-foreground/50 mt-0.5">{track.channelTitle}</p>
+                      </div>
+                    </div>
+                  ))}
+                  {currentTrack && <div className="h-px bg-primary/10 mx-1" />}
+                </>
+              )}
+
+              {/* Currently playing */}
               {currentTrack && (
                 <div className="flex items-center gap-2.5 p-2.5 rounded-2xl bg-primary/5 border border-primary/20">
                   <div className="relative w-12 h-10 rounded-xl overflow-hidden flex-shrink-0">
@@ -215,7 +244,9 @@ function PlaylistTab({ playlist, currentTrack, isHost, onAddTrack, onRemoveTrack
                   </div>
                 </div>
               )}
-              {playlist.length > 0 && currentTrack && (
+
+              {/* Upcoming */}
+              {playlist.length > 0 && (
                 <p className="text-[10px] font-semibold text-muted-foreground/40 uppercase tracking-wider px-1 pt-1">Tiếp theo</p>
               )}
               {playlist.map((track, i) => (
