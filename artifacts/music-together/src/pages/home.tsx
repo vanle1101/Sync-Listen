@@ -319,6 +319,14 @@ export default function Home() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Footer */}
+      <footer className="absolute bottom-4 left-0 right-0 flex justify-center pointer-events-none z-10">
+        <p className="text-[11px] text-muted-foreground/40 tracking-wide select-none text-center">
+          <span className="font-semibold text-primary/40">Chillwithvan</span>
+          {" "}© 2026 — Miễn phí, không quảng cáo, không cần tài khoản
+        </p>
+      </footer>
     </div>
   );
 }
