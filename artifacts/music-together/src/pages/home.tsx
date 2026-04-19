@@ -92,7 +92,7 @@ export default function Home() {
               <Button 
                 onClick={handleCreateRoom} 
                 disabled={!name.trim() || createRoom.isPending}
-                className="w-full h-14 text-lg font-medium rounded-2xl bg-primary hover:bg-primary/90 text-white shadow-[0_10px_20px_rgba(231,84,128,0.2)] transition-all hover:scale-[1.02] active:scale-[0.98]"
+                className="w-full h-14 text-lg font-medium rounded-2xl bg-primary hover:bg-primary/90 text-white shadow-[0_8px_20px_rgba(192,112,128,0.28)] transition-all hover:scale-[1.02] active:scale-[0.98]"
               >
                 {createRoom.isPending ? <Loader2 className="w-5 h-5 animate-spin" /> : "Tạo phòng mới"}
               </Button>

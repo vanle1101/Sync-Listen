@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Playfair+Display:ital,wght@0,400;0,700;1,400;1,700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Lora:ital,wght@0,400;0,500;0,600;1,400;1,500&family=Nunito:wght@300;400;500;600;700&display=swap');
 @import "tailwindcss";
 @import "tw-animate-css";
 @plugin "@tailwindcss/typography";
@@ -53,84 +53,100 @@
 }
 
 :root {
-  --background: 24 60% 97%; /* #fdf6f0 warm off-white */
-  --foreground: 290 25% 25%; /* #4a3550 warm charcoal */
+  /* Vintage warm palette */
+  --background: 33 48% 93%;    /* warm parchment #f0e6d3 */
+  --foreground: 22 35% 22%;    /* dark warm brown #4a3020 */
 
-  --card: 350 100% 98%; /* soft blush tint */
-  --card-foreground: 290 25% 25%;
-  --card-border: 335 30% 93%; /* #f0d9e2 */
+  --card: 36 50% 97%;          /* ivory white */
+  --card-foreground: 22 35% 22%;
+  --card-border: 30 30% 86%;   /* warm beige border */
 
-  --popover: 0 0% 100%;
-  --popover-foreground: 290 25% 25%;
-  --popover-border: 335 30% 93%;
+  --popover: 36 50% 98%;
+  --popover-foreground: 22 35% 22%;
+  --popover-border: 30 30% 86%;
 
-  --primary: 341 77% 62%; /* #e75480 soft rose pink */
+  --primary: 345 32% 55%;      /* dusty rose #c07080 */
   --primary-foreground: 0 0% 100%;
+  --primary-border: hsl(345 32% 55%);
 
-  --secondary: 262 42% 64%; /* #9b7ec8 soft lavender */
+  --secondary: 120 14% 56%;    /* sage green #7f9e82 */
   --secondary-foreground: 0 0% 100%;
+  --secondary-border: hsl(120 14% 56%);
 
-  --muted: 335 30% 95%;
-  --muted-foreground: 290 15% 45%;
+  --muted: 33 30% 90%;
+  --muted-foreground: 22 20% 45%;
+  --muted-border: hsl(33 30% 90%);
 
-  --accent: 341 77% 62%;
+  --accent: 25 55% 62%;        /* warm amber/terracotta #c89060 */
   --accent-foreground: 0 0% 100%;
+  --accent-border: hsl(25 55% 62%);
 
-  --destructive: 0 84% 60%;
+  --destructive: 0 60% 55%;
   --destructive-foreground: 0 0% 100%;
+  --destructive-border: hsl(0 60% 55%);
 
-  --border: 335 30% 93%;
-  --input: 335 30% 93%;
-  --ring: 341 77% 62%;
+  --border: 30 25% 84%;
+  --input: 33 30% 92%;
+  --ring: 345 32% 55%;
 
-  --app-font-sans: 'Outfit', sans-serif;
-  --app-font-serif: 'Playfair Display', serif;
+  --app-font-sans: 'Nunito', sans-serif;
+  --app-font-serif: 'Lora', serif;
   --app-font-mono: monospace;
-  --radius: 1rem; 
-
-  --primary-border: hsl(var(--primary));
-  --secondary-border: hsl(var(--secondary));
-  --muted-border: hsl(var(--muted));
-  --accent-border: hsl(var(--accent));
-  --destructive-border: hsl(var(--destructive));
+  --radius: 0.85rem;
 }
 
+/* ── Custom cursors ─────────────────────────────── */
+*, *::before, *::after {
+  cursor: url('/cursor-arrow.png') 11 9, default !important;
+}
+
+a, button, [role="button"], input, select, textarea, label,
+[tabindex]:not([tabindex="-1"]), .cursor-pointer {
+  cursor: url('/cursor-pointer.png') 28 5, pointer !important;
+}
+
+/* ── Base ────────────────────────────────────────── */
 @layer base {
   * {
     @apply border-border;
   }
   body {
-    @apply font-sans antialiased bg-background text-foreground selection:bg-primary/30 selection:text-foreground;
-    background-image: 
-      radial-gradient(circle at 10% 20%, rgba(231, 84, 128, 0.05), transparent 40%),
-      radial-gradient(circle at 90% 80%, rgba(155, 126, 200, 0.05), transparent 40%);
+    @apply font-sans antialiased bg-background text-foreground selection:bg-primary/25 selection:text-foreground;
+    background-image:
+      radial-gradient(ellipse at 15% 25%, hsla(345,40%,75%,0.18) 0%, transparent 50%),
+      radial-gradient(ellipse at 85% 75%, hsla(120,25%,65%,0.14) 0%, transparent 50%),
+      url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23c07080' fill-opacity='0.03'%3E%3Ccircle cx='30' cy='30' r='2'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
     background-attachment: fixed;
+  }
+  h1, h2, h3 {
+    @apply font-serif;
   }
 }
 
+/* ── Vintage card ───────────────────────────────── */
 .bloom-card {
-  @apply bg-white/70 backdrop-blur-md border border-card-border shadow-[0_8px_30px_rgb(231,84,128,0.08)] rounded-3xl;
+  background: linear-gradient(135deg, hsla(36,55%,99%,0.9) 0%, hsla(33,45%,96%,0.85) 100%);
+  backdrop-filter: blur(12px);
+  border: 1px solid hsl(30 28% 86%);
+  border-radius: 1.5rem;
+  box-shadow:
+    0 2px 0px hsl(30 25% 80%),
+    0 8px 32px hsla(22,35%,22%,0.08),
+    0 2px 8px hsla(22,35%,22%,0.04);
 }
 
+/* ── Soft glow ──────────────────────────────────── */
 .soft-glow {
-  box-shadow: 0 0 20px rgba(231, 84, 128, 0.2);
+  box-shadow: 0 0 24px hsla(345, 32%, 55%, 0.22);
 }
 
-.petal-bg {
-  background: radial-gradient(circle at center, rgba(255, 240, 243, 0.8) 0%, rgba(253, 246, 240, 1) 100%);
-}
-
-::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
-}
-::-webkit-scrollbar-track {
-  background: transparent;
-}
+/* ── Scrollbar ──────────────────────────────────── */
+::-webkit-scrollbar { width: 5px; height: 5px; }
+::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb {
-  background: hsl(var(--primary) / 0.1);
+  background: hsl(345 32% 55% / 0.18);
   border-radius: 10px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: hsl(var(--primary) / 0.2);
+  background: hsl(345 32% 55% / 0.32);
 }

@@ -11,7 +11,7 @@ interface PlayerControlsProps {
 
 export function PlayerControls({ isHost, playing, onPlayPause, onSkip, disabled = false }: PlayerControlsProps) {
   return (
-    <div className="flex items-center justify-between bg-white/60 backdrop-blur-xl border border-primary/5 p-5 rounded-3xl shadow-[0_10px_40px_rgba(231,84,128,0.1)] mt-6 soft-glow">
+    <div className="flex items-center justify-between bg-white/60 backdrop-blur-xl border border-primary/5 p-5 rounded-3xl shadow-[0_10px_40px_rgba(192,112,128,0.12)] mt-6 soft-glow">
       <div className="flex items-center gap-4">
         {!isHost && (
           <div className="text-xs font-medium text-primary/70 bg-primary/5 px-4 py-1.5 rounded-full flex items-center gap-2 border border-primary/10">
@@ -50,7 +50,7 @@ export function PlayerControls({ isHost, playing, onPlayPause, onSkip, disabled 
       <div className="flex items-center gap-3 text-primary/60">
         <Volume2 className="w-5 h-5" />
         <div className="w-28 h-2 bg-primary/10 rounded-full overflow-hidden shadow-inner">
-          <div className="w-2/3 h-full bg-gradient-to-r from-primary to-[#ff7eb3] rounded-full"></div>
+          <div className="w-2/3 h-full bg-gradient-to-r from-primary to-secondary rounded-full opacity-70"></div>
         </div>
       </div>
     </div>

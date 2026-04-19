@@ -63,7 +63,7 @@ export function ChatPanel({ messages, onSendMessage, currentUser }: ChatPanelPro
                   </div>
                   <div className={`px-5 py-2.5 rounded-3xl max-w-[90%] break-words text-sm shadow-sm transition-all hover:shadow-md ${
                     isMe 
-                      ? 'bg-gradient-to-br from-primary to-[#ff7eb3] text-white rounded-tr-none' 
+                      ? 'bg-gradient-to-br from-primary to-[#d4a0ab] text-white rounded-tr-none' 
                       : 'bg-white border border-primary/5 text-foreground rounded-tl-none'
                   }`}>
                     {msg.text}
