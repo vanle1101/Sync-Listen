@@ -36,6 +36,12 @@ export function YoutubePlayer({
   const heartbeatInterval = useRef<NodeJS.Timeout | null>(null);
   const timeUpdateInterval = useRef<NodeJS.Timeout | null>(null);
   const internalPlayingState = useRef<boolean>(false);
+  const audioCtxRef = useRef<AudioContext | null>(null);
+  const silentSourceRef = useRef<AudioBufferSourceNode | null>(null);
+  const playingRef = useRef(playing);
+
+  // Keep playingRef in sync for visibility handler closure
+  useEffect(() => { playingRef.current = playing; }, [playing]);
 
   useEffect(() => {
     if (!window.YT) {
@@ -161,7 +167,94 @@ export function YoutubePlayer({
     return () => { if (timeUpdateInterval.current) clearInterval(timeUpdateInterval.current); };
   }, [isReady, onTimeUpdate]);
 
-  // Media Session API for background/lock screen playback
+  // ── Silent Web Audio loop ────────────────────────────────────────────────
+  // Keeps the browser's audio context alive so the page is treated as
+  // "playing audio" — this prevents Android/Chromium from suspending the
+  // YouTube iframe when the screen locks.
+  const startSilentAudio = () => {
+    try {
+      const AC = (window as any).AudioContext || (window as any).webkitAudioContext;
+      if (!AC) return;
+      if (!audioCtxRef.current || audioCtxRef.current.state === 'closed') {
+        audioCtxRef.current = new AC();
+      }
+      const ctx = audioCtxRef.current;
+      if (ctx.state === 'suspended') ctx.resume();
+
+      // Stop any existing source
+      try { silentSourceRef.current?.stop(); } catch {}
+
+      // 1-second silent buffer, looping forever
+      const buffer = ctx.createBuffer(1, ctx.sampleRate, ctx.sampleRate);
+      const src = ctx.createBufferSource();
+      src.buffer = buffer;
+      src.loop = true;
+      const gain = ctx.createGain();
+      gain.gain.value = 0; // completely silent
+      src.connect(gain);
+      gain.connect(ctx.destination);
+      src.start(0);
+      silentSourceRef.current = src;
+    } catch {}
+  };
+
+  const stopSilentAudio = () => {
+    try {
+      silentSourceRef.current?.stop();
+      silentSourceRef.current = null;
+    } catch {}
+  };
+
+  // Start/stop silent audio based on playback state
+  useEffect(() => {
+    if (playing && currentTrack) {
+      startSilentAudio();
+    } else {
+      stopSilentAudio();
+    }
+  }, [playing, currentTrack?.videoId]);
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      stopSilentAudio();
+      try { audioCtxRef.current?.close(); } catch {}
+    };
+  }, []);
+
+  // ── Page Visibility handler ───────────────────────────────────────────────
+  // When the user unlocks the screen, resume AudioContext and re-sync player
+  useEffect(() => {
+    const handleVisibility = () => {
+      if (!document.hidden) {
+        // Resume audio context if it was suspended
+        try { audioCtxRef.current?.resume(); } catch {}
+        // If we should be playing, force the player to play
+        if (playingRef.current && playerRef.current && isReady) {
+          setTimeout(() => {
+            try { playerRef.current?.playVideo(); } catch {}
+          }, 300);
+        }
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibility);
+    return () => document.removeEventListener('visibilitychange', handleVisibility);
+  }, [isReady]);
+
+  // Unlock AudioContext on first user interaction (required by browser policy)
+  useEffect(() => {
+    const unlock = () => {
+      try { audioCtxRef.current?.resume(); } catch {}
+    };
+    document.addEventListener('touchstart', unlock, { once: true });
+    document.addEventListener('click', unlock, { once: true });
+    return () => {
+      document.removeEventListener('touchstart', unlock);
+      document.removeEventListener('click', unlock);
+    };
+  }, []);
+
+  // ── Media Session API ─────────────────────────────────────────────────────
   useEffect(() => {
     if (!('mediaSession' in navigator)) return;
     if (currentTrack) {
@@ -191,11 +284,30 @@ export function YoutubePlayer({
       onStateChange?.(false, playerRef.current?.getCurrentTime() || 0);
     });
     navigator.mediaSession.setActionHandler('nexttrack', () => onTrackEnd?.());
+    navigator.mediaSession.setActionHandler('previoustrack', () => {
+      const ct = playerRef.current?.getCurrentTime() || 0;
+      if (ct > 3) {
+        playerRef.current?.seekTo(0, true);
+      } else {
+        onStateChange?.(false, 0);
+      }
+    });
+    // Seek forward/backward 10 seconds from lock screen
+    navigator.mediaSession.setActionHandler('seekforward', (d) => {
+      const skip = d.seekOffset ?? 10;
+      const cur = playerRef.current?.getCurrentTime() || 0;
+      playerRef.current?.seekTo(cur + skip, true);
+    });
+    navigator.mediaSession.setActionHandler('seekbackward', (d) => {
+      const skip = d.seekOffset ?? 10;
+      const cur = playerRef.current?.getCurrentTime() || 0;
+      playerRef.current?.seekTo(Math.max(0, cur - skip), true);
+    });
     return () => {
       try {
-        navigator.mediaSession.setActionHandler('play', null);
-        navigator.mediaSession.setActionHandler('pause', null);
-        navigator.mediaSession.setActionHandler('nexttrack', null);
+        ['play','pause','nexttrack','previoustrack','seekforward','seekbackward'].forEach(a => {
+          navigator.mediaSession.setActionHandler(a as MediaSessionAction, null);
+        });
       } catch {}
     };
   }, [isHost, isReady]);
