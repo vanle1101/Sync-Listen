@@ -20,6 +20,9 @@ export default function Room() {
   
   const [userName, setUserName] = useState<string | null>(null);
   const [isChatOpen, setIsChatOpen] = useState(true);
+  const [volume, setVolume] = useState(80);
+  const [playerCurrentTime, setPlayerCurrentTime] = useState(0);
+  const [playerDuration, setPlayerDuration] = useState(0);
   
   useEffect(() => {
     const name = sessionStorage.getItem("music-together-name");
@@ -73,6 +76,23 @@ export default function Room() {
 
   const handleRemoveTrack = (index: number) => {
     sendAction({ type: "remove_track", index });
+  };
+
+  const handlePlayTrack = (index: number) => {
+    sendAction({ type: "play_track", index });
+  };
+
+  const handleSeek = (time: number) => {
+    sendAction({ type: "seek", currentTime: time });
+  };
+
+  const handleVolumeChange = (vol: number) => {
+    setVolume(vol);
+  };
+
+  const handleTimeUpdate = (currentTime: number, duration: number) => {
+    setPlayerCurrentTime(currentTime);
+    setPlayerDuration(duration);
   };
 
   const handlePlayPause = () => {
@@ -184,15 +204,22 @@ export default function Room() {
               playing={roomState?.playing || false}
               serverTime={roomState?.currentTime || 0}
               isHost={isHost}
+              volume={volume}
               onStateChange={handlePlayerStateChange}
               onTrackEnd={handleTrackEnd}
+              onTimeUpdate={handleTimeUpdate}
             />
             
             <PlayerControls 
               isHost={isHost}
               playing={roomState?.playing || false}
+              currentTime={playerCurrentTime}
+              duration={playerDuration}
+              volume={volume}
               onPlayPause={handlePlayPause}
               onSkip={handleSkip}
+              onSeek={handleSeek}
+              onVolumeChange={handleVolumeChange}
               disabled={!roomState?.currentTrack}
             />
           </div>
@@ -203,6 +230,7 @@ export default function Room() {
                 playlist={roomState?.playlist || []}
                 currentTrack={roomState?.currentTrack || null}
                 onRemoveTrack={handleRemoveTrack}
+                onPlayTrack={handlePlayTrack}
                 isHost={isHost}
               />
             </div>

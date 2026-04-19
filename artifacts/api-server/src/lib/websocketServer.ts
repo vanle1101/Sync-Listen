@@ -89,22 +89,32 @@ export function setupWebSocketServer(server: http.Server): void {
         case "add_track": {
           const track = msg.track as Track;
           if (!track?.videoId) break;
-          logger.info({ roomId: currentRoomId, trackId: track.videoId, title: track.title }, "Track added");
+          logger.info({ roomId: currentRoomId, trackId: track.videoId, title: track.title }, "Track added to queue");
           room.playlist.push(track);
-          if (!room.currentTrack) {
-            room.currentTrack = room.playlist[0];
-            room.playlist.shift();
-          }
           broadcast(currentRoomId, { type: "playlist_update", playlist: room.playlist });
-          if (room.currentTrack) {
-            broadcast(currentRoomId, {
-              type: "playback",
-              playing: room.playing,
-              currentTime: room.currentTime,
-              videoId: room.currentTrack.videoId,
-              currentTrack: room.currentTrack,
-            });
+          break;
+        }
+
+        case "play_track": {
+          if (!isHost) {
+            sendToSocket(ws, { type: "error", message: "Only the host can start playback" });
+            break;
           }
+          const index = typeof msg.index === "number" ? msg.index : 0;
+          if (index < 0 || index >= room.playlist.length) break;
+          room.currentTrack = room.playlist[index];
+          room.playlist.splice(index, 1);
+          room.playing = true;
+          room.currentTime = 0;
+          logger.info({ roomId: currentRoomId, trackId: room.currentTrack.videoId }, "Host started track");
+          broadcast(currentRoomId, { type: "playlist_update", playlist: room.playlist });
+          broadcast(currentRoomId, {
+            type: "playback",
+            playing: true,
+            currentTime: 0,
+            videoId: room.currentTrack.videoId,
+            currentTrack: room.currentTrack,
+          });
           break;
         }
 
@@ -121,8 +131,16 @@ export function setupWebSocketServer(server: http.Server): void {
             sendToSocket(ws, { type: "error", message: "Only the host can control playback" });
             break;
           }
-          room.playing = msg.playing as boolean;
-          room.currentTime = (msg.currentTime as number) ?? room.currentTime;
+          // If no current track but queue has items, start the first one
+          if (!room.currentTrack && room.playlist.length > 0) {
+            room.currentTrack = room.playlist.shift()!;
+            room.playing = true;
+            room.currentTime = 0;
+            broadcast(currentRoomId, { type: "playlist_update", playlist: room.playlist });
+          } else {
+            room.playing = msg.playing as boolean;
+            room.currentTime = (msg.currentTime as number) ?? room.currentTime;
+          }
           broadcast(currentRoomId, {
             type: "playback",
             playing: room.playing,

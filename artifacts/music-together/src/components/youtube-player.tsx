@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { Track } from "@/lib/types";
 
-// Add YouTube type declarations
 declare global {
   interface Window {
     YT: any;
@@ -14,8 +13,10 @@ interface YoutubePlayerProps {
   playing: boolean;
   serverTime: number;
   isHost: boolean;
+  volume: number;
   onStateChange?: (playing: boolean, currentTime: number) => void;
   onTrackEnd?: () => void;
+  onTimeUpdate?: (currentTime: number, duration: number) => void;
 }
 
 export function YoutubePlayer({
@@ -23,17 +24,19 @@ export function YoutubePlayer({
   playing,
   serverTime,
   isHost,
+  volume,
   onStateChange,
-  onTrackEnd
+  onTrackEnd,
+  onTimeUpdate,
 }: YoutubePlayerProps) {
   const playerRef = useRef<any>(null);
   const [isReady, setIsReady] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
   const lastSyncTime = useRef<number>(0);
   const heartbeatInterval = useRef<NodeJS.Timeout | null>(null);
+  const timeUpdateInterval = useRef<NodeJS.Timeout | null>(null);
   const internalPlayingState = useRef<boolean>(false);
 
-  // Initialize YouTube API
   useEffect(() => {
     if (!window.YT) {
       const tag = document.createElement("script");
@@ -42,10 +45,7 @@ export function YoutubePlayer({
       if (firstScriptTag.parentNode) {
         firstScriptTag.parentNode.insertBefore(tag, firstScriptTag);
       }
-      
-      window.onYouTubeIframeAPIReady = () => {
-        initPlayer();
-      };
+      window.onYouTubeIframeAPIReady = () => { initPlayer(); };
     } else if (!playerRef.current) {
       initPlayer();
     }
@@ -62,19 +62,15 @@ export function YoutubePlayer({
           rel: 0,
           modestbranding: 1,
           playsinline: 1,
-          iv_load_policy: 3
+          iv_load_policy: 3,
         },
         events: {
-          onReady: () => {
-            setIsReady(true);
-          },
+          onReady: () => { setIsReady(true); },
           onStateChange: (event: any) => {
             if (!isHost) return;
-            
             const PLAYING = window.YT.PlayerState.PLAYING;
             const PAUSED = window.YT.PlayerState.PAUSED;
             const ENDED = window.YT.PlayerState.ENDED;
-            
             if (event.data === PLAYING) {
               internalPlayingState.current = true;
               onStateChange?.(true, playerRef.current.getCurrentTime());
@@ -85,52 +81,42 @@ export function YoutubePlayer({
               internalPlayingState.current = false;
               onTrackEnd?.();
             }
-          }
-        }
+          },
+        },
       });
     }
 
     return () => {
-      if (playerRef.current && playerRef.current.destroy) {
-        playerRef.current.destroy();
-      }
-      if (heartbeatInterval.current) {
-        clearInterval(heartbeatInterval.current);
-      }
+      if (playerRef.current?.destroy) playerRef.current.destroy();
+      if (heartbeatInterval.current) clearInterval(heartbeatInterval.current);
+      if (timeUpdateInterval.current) clearInterval(timeUpdateInterval.current);
     };
   }, []);
 
-  // Handle track changes
+  // Track changes
   useEffect(() => {
     if (!isReady || !playerRef.current) return;
-
     if (currentTrack) {
       const currentVideoId = playerRef.current.getVideoData?.()?.video_id;
       if (currentVideoId !== currentTrack.videoId) {
         playerRef.current.loadVideoById(currentTrack.videoId, serverTime);
-        if (!playing) {
-          playerRef.current.pauseVideo();
-        }
+        if (!playing) playerRef.current.pauseVideo();
       }
     } else {
       playerRef.current.stopVideo();
     }
   }, [currentTrack?.videoId, isReady]);
 
-  // Handle playback state and sync from server
+  // Playback sync
   useEffect(() => {
     if (!isReady || !playerRef.current || !currentTrack) return;
-
     internalPlayingState.current = playing;
-    
     try {
       if (playing) {
         playerRef.current.playVideo();
       } else {
         playerRef.current.pauseVideo();
       }
-
-      // Sync time if diff > 2 seconds
       const playerTime = playerRef.current.getCurrentTime() || 0;
       if (Math.abs(playerTime - serverTime) > 2) {
         playerRef.current.seekTo(serverTime, true);
@@ -140,31 +126,47 @@ export function YoutubePlayer({
     }
   }, [playing, serverTime, isReady, currentTrack]);
 
+  // Volume sync
+  useEffect(() => {
+    if (!isReady || !playerRef.current) return;
+    try {
+      playerRef.current.setVolume(volume);
+    } catch {}
+  }, [volume, isReady]);
+
   // Host heartbeat
   useEffect(() => {
     if (isHost && isReady) {
       heartbeatInterval.current = setInterval(() => {
         if (internalPlayingState.current && playerRef.current) {
-          const currentTime = playerRef.current.getCurrentTime();
-          onStateChange?.(true, currentTime);
+          onStateChange?.(true, playerRef.current.getCurrentTime());
         }
       }, 5000);
     }
-    
-    return () => {
-      if (heartbeatInterval.current) {
-        clearInterval(heartbeatInterval.current);
-      }
-    };
+    return () => { if (heartbeatInterval.current) clearInterval(heartbeatInterval.current); };
   }, [isHost, isReady, onStateChange]);
+
+  // Time update for seek bar
+  useEffect(() => {
+    if (!isReady) return;
+    timeUpdateInterval.current = setInterval(() => {
+      if (playerRef.current) {
+        try {
+          const ct = playerRef.current.getCurrentTime?.() ?? 0;
+          const dur = playerRef.current.getDuration?.() ?? 0;
+          onTimeUpdate?.(ct, dur);
+        } catch {}
+      }
+    }, 500);
+    return () => { if (timeUpdateInterval.current) clearInterval(timeUpdateInterval.current); };
+  }, [isReady, onTimeUpdate]);
 
   return (
     <div className="relative w-full pt-[56.25%] bg-white rounded-[2rem] overflow-hidden border border-primary/10 group shadow-2xl soft-glow">
-      {/* YT player is pushed back and pointer events disabled to prevent direct interaction, we use custom controls */}
       <div className="absolute inset-0 z-0 pointer-events-none opacity-90 group-hover:opacity-100 transition-opacity duration-700">
         <div ref={containerRef} id="youtube-player" className="w-full h-full scale-[1.1]"></div>
       </div>
-      
+
       {!currentTrack && (
         <div className="absolute inset-0 z-10 flex flex-col items-center justify-center text-primary/40">
           <div className="w-20 h-20 rounded-full bg-primary/5 flex items-center justify-center mb-6 soft-glow">
@@ -173,11 +175,9 @@ export function YoutubePlayer({
           <p className="text-lg font-serif italic font-medium tracking-wide">Chưa có bài hát đang phát</p>
         </div>
       )}
-      
-      {/* Overlay to catch clicks and prevent youtube's default controls from interfering */}
+
       <div className="absolute inset-0 z-20 pointer-events-auto bg-transparent"></div>
-      
-      {/* Current track info overlay */}
+
       {currentTrack && (
         <div className="absolute bottom-0 left-0 right-0 p-8 z-30 bg-gradient-to-t from-white/95 via-white/60 to-transparent pointer-events-none backdrop-blur-[2px]">
           <div className="flex items-end gap-6">

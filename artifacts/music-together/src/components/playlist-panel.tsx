@@ -6,10 +6,11 @@ interface PlaylistPanelProps {
   playlist: Track[];
   currentTrack: Track | null;
   onRemoveTrack: (index: number) => void;
+  onPlayTrack: (index: number) => void;
   isHost: boolean;
 }
 
-export function PlaylistPanel({ playlist, currentTrack, onRemoveTrack, isHost }: PlaylistPanelProps) {
+export function PlaylistPanel({ playlist, currentTrack, onRemoveTrack, onPlayTrack, isHost }: PlaylistPanelProps) {
   const totalCount = (currentTrack ? 1 : 0) + playlist.length;
 
   return (
@@ -77,7 +78,8 @@ export function PlaylistPanel({ playlist, currentTrack, onRemoveTrack, isHost }:
                 {playlist.map((track, i) => (
                   <div
                     key={`${track.videoId}-${i}`}
-                    className="relative flex items-center gap-3 p-3 pr-12 rounded-2xl hover:bg-white border border-transparent hover:shadow-md hover:border-primary/10 transition-all duration-300"
+                    className="group relative flex items-center gap-3 p-3 rounded-2xl hover:bg-white border border-transparent hover:shadow-md hover:border-primary/10 transition-all duration-300"
+                    style={{ paddingRight: isHost ? '5.5rem' : '0.75rem' }}
                   >
                     <div className="relative w-12 h-10 rounded-xl overflow-hidden flex-shrink-0 bg-muted shadow-sm">
                       {track.thumbnail ? (
@@ -95,15 +97,26 @@ export function PlaylistPanel({ playlist, currentTrack, onRemoveTrack, isHost }:
                     </div>
 
                     {isHost && (
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="absolute right-2 top-1/2 -translate-y-1/2 h-8 w-8 text-muted-foreground/40 hover:text-red-500 hover:bg-red-50 rounded-xl transition-all"
-                        onClick={() => onRemoveTrack(i)}
-                        title="Xoá khỏi hàng đợi"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </Button>
+                      <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 text-primary/60 hover:text-white hover:bg-primary rounded-xl transition-all active:scale-90"
+                          onClick={() => onPlayTrack(i)}
+                          title="Phát bài này"
+                        >
+                          <Play className="w-4 h-4 fill-current" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 text-muted-foreground/40 hover:text-red-500 hover:bg-red-50 rounded-xl transition-all"
+                          onClick={() => onRemoveTrack(i)}
+                          title="Xoá khỏi hàng đợi"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </Button>
+                      </div>
                     )}
                   </div>
                 ))}
