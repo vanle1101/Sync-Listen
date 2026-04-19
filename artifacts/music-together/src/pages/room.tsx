@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { useParams, useLocation } from "wouter";
 import { useWebSocket } from "@/hooks/use-websocket";
 import { Track } from "@/lib/types";
@@ -6,288 +6,564 @@ import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import { YoutubePlayer } from "@/components/youtube-player";
 import { PlayerControls } from "@/components/player-controls";
-import { PlaylistPanel } from "@/components/playlist-panel";
-import { SearchPanel } from "@/components/search-panel";
-import { ChatPanel } from "@/components/chat-panel";
-import { Copy, LogOut, Loader2, Music, MessageSquare, MessageSquareOff } from "lucide-react";
+import { RightPanel } from "@/components/right-panel";
+import {
+  Music, Loader2, Copy, LogOut, Minimize2, Share2, CreditCard,
+  Palette, Coffee, UserCheck, Settings, Globe, Users, X, Download, Check
+} from "lucide-react";
 import { useGetRoom, getGetRoomQueryKey } from "@workspace/api-client-react";
 
+/* ──────────────── helpers ──────────────── */
 function saveRecentRoom(roomId: string, hostName: string) {
   try {
     const key = "music-together-rooms";
     const raw = localStorage.getItem(key);
     const rooms: { id: string; hostName: string; visitedAt: number }[] = raw ? JSON.parse(raw) : [];
-    const filtered = rooms.filter((r) => r.id !== roomId);
+    const filtered = rooms.filter(r => r.id !== roomId);
     filtered.unshift({ id: roomId, hostName, visitedAt: Date.now() });
     localStorage.setItem(key, JSON.stringify(filtered.slice(0, 8)));
   } catch {}
 }
 
+function nowTime() { return new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }); }
+
+/* ──────────────── Themes ──────────────── */
+const THEMES = [
+  { id: "cream",    name: "Kem hoa",    colors: ["#fdf6f0","#c07080","#7a9e7e"], bg: "from-[#fdf6f0] via-[#fce8e8] to-[#eef5ef]" },
+  { id: "midnight", name: "Đêm xanh",   colors: ["#1e1b2e","#8b7dff","#5eead4"], bg: "from-[#1e1b2e] via-[#2d1b3d] to-[#1a2e2a]" },
+  { id: "garden",   name: "Vườn xanh",  colors: ["#eef4ee","#4a7c59","#8b7355"], bg: "from-[#eef4ee] via-[#ddeedd] to-[#f5f0e8]" },
+  { id: "rose",     name: "Hồng phấn",  colors: ["#fdf0f3","#d4687a","#d4a064"], bg: "from-[#fdf0f3] via-[#fce0e8] to-[#fdf5e8]" },
+  { id: "lavender", name: "Oải hương",  colors: ["#f4f0fc","#8b6cce","#c07080"], bg: "from-[#f4f0fc] via-[#ece0f8] to-[#fce8f0]" },
+  { id: "ocean",    name: "Đại dương",  colors: ["#eef4f8","#2d7dd2","#2da88e"], bg: "from-[#eef4f8] via-[#ddeef8] to-[#e0f5f0]" },
+];
+
+/* ──────────────── WaitingIllustration ──────────────── */
+function WaitingIllustration() {
+  return (
+    <div className="flex-1 flex flex-col items-center justify-center relative overflow-hidden select-none px-8">
+      {/* Watermark left */}
+      <div className="absolute left-0 top-0 bottom-0 flex items-center pl-4 opacity-10 pointer-events-none">
+        <svg viewBox="0 0 120 200" width="120" height="200" className="text-primary fill-current">
+          <text x="10" y="80" fontSize="90" fontFamily="serif">𝄞</text>
+          <text x="20" y="140" fontSize="35">♩</text>
+          <text x="60" y="170" fontSize="30">♫</text>
+          <text x="5" y="185" fontSize="28">♪</text>
+        </svg>
+      </div>
+      {/* Watermark right */}
+      <div className="absolute right-0 top-0 bottom-0 flex items-center pr-4 opacity-8 pointer-events-none">
+        <svg viewBox="0 0 140 140" width="140" height="140">
+          <ellipse cx="70" cy="95" rx="55" ry="30" fill="none" stroke="currentColor" strokeWidth="14" className="text-primary/20"/>
+          <rect x="15" y="35" width="110" height="60" rx="55" fill="none" stroke="currentColor" strokeWidth="14" className="text-primary/20"/>
+          <circle cx="25" cy="90" r="18" fill="currentColor" className="text-primary/20"/>
+          <circle cx="115" cy="90" r="18" fill="currentColor" className="text-primary/20"/>
+        </svg>
+      </div>
+
+      {/* Center illustration */}
+      <div className="relative flex flex-col items-center gap-6 z-10">
+        {/* Record player in circle */}
+        <div className="w-44 h-44 rounded-full flex items-center justify-center shadow-2xl relative"
+          style={{ background: 'radial-gradient(circle at 40% 35%, #fdf0e0, #f5d8c0)' }}>
+          {/* Record player body */}
+          <div className="relative">
+            <div className="w-24 h-20 rounded-2xl shadow-md flex items-end justify-center pb-2"
+              style={{ background: 'linear-gradient(145deg, #c87050, #a05030)' }}>
+              {/* Platter */}
+              <div className="absolute top-3 left-1/2 -translate-x-1/2">
+                <svg width="56" height="56" viewBox="0 0 56 56" className="animate-[spin_4s_linear_infinite]">
+                  <circle cx="28" cy="28" r="27" fill="#1a0f0a"/>
+                  <circle cx="28" cy="28" r="19" fill="#140c07"/>
+                  <circle cx="28" cy="28" r="10" fill="#160d08"/>
+                  <circle cx="28" cy="28" r="4" fill="#c07060"/>
+                  <circle cx="28" cy="28" r="1.5" fill="#f5e0d0"/>
+                  <path d="M6 28 Q28 4 50 28" stroke="rgba(255,255,255,0.05)" strokeWidth="5" fill="none"/>
+                </svg>
+              </div>
+              {/* Tone arm */}
+              <div className="absolute top-4 right-3 w-0.5 h-10 rounded-full origin-top"
+                style={{ background: '#d4a060', transform: 'rotate(20deg)' }} />
+              {/* Feet */}
+              <div className="flex gap-6">
+                <div className="w-2 h-2 rounded-full bg-[#7a4020]" />
+                <div className="w-2 h-2 rounded-full bg-[#7a4020]" />
+              </div>
+            </div>
+            {/* Music notes floating */}
+            <div className="absolute -top-6 -right-8 text-2xl animate-bounce" style={{ animationDuration: '2.5s', color: '#c07080' }}>♪</div>
+            <div className="absolute -top-8 right-0 text-xl animate-bounce" style={{ animationDuration: '3s', animationDelay: '0.5s', color: '#7a9e7e' }}>♫</div>
+            <div className="absolute -top-4 -left-8 text-lg animate-bounce" style={{ animationDuration: '2.8s', animationDelay: '1s', color: '#c07080' }}>♩</div>
+          </div>
+        </div>
+
+        <div className="text-center">
+          <h2 className="text-2xl font-serif italic font-semibold text-foreground/80">Không gian chờ</h2>
+          <p className="text-sm text-muted-foreground/60 mt-2 max-w-xs leading-relaxed">
+            Host chưa phát bài nào. Hãy thư giãn hoặc yêu cầu bài hát bên cột phải nhé!
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ──────────────── Share Modal ──────────────── */
+function ShareModal({ roomId, onClose }: { roomId: string; onClose: () => void }) {
+  const [copied, setCopied] = useState(false);
+  const link = `${window.location.origin}/room/${roomId}`;
+  const copy = () => {
+    navigator.clipboard.writeText(link);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+  return (
+    <ModalBase title="Chia sẻ phòng" onClose={onClose}>
+      <p className="text-sm text-muted-foreground mb-4">Gửi link này để mời bạn bè cùng nghe nhạc</p>
+      <div className="flex gap-2">
+        <div className="flex-1 bg-primary/5 border border-primary/10 rounded-2xl px-4 py-3 text-sm font-mono text-foreground/70 truncate">{link}</div>
+        <button onClick={copy} className={`px-4 py-3 rounded-2xl text-sm font-medium transition-all flex items-center gap-2 ${copied ? 'bg-secondary text-white' : 'bg-primary text-white hover:bg-primary/90'}`}>
+          {copied ? <><Check className="w-4 h-4" /> Đã sao chép</> : <><Copy className="w-4 h-4" /> Sao chép</>}
+        </button>
+      </div>
+      <div className="mt-4 p-4 bg-primary/5 rounded-2xl text-center">
+        <p className="text-xs text-muted-foreground/60 mb-1">Mã phòng</p>
+        <p className="text-3xl font-mono font-bold tracking-[0.3em] text-primary">{roomId}</p>
+      </div>
+    </ModalBase>
+  );
+}
+
+/* ──────────────── Postcard Modal ──────────────── */
+function PostcardModal({ roomId, hostName, onClose }: { roomId: string; hostName: string; onClose: () => void }) {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const [drawn, setDrawn] = useState(false);
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+    canvas.width = 600; canvas.height = 380;
+
+    // Background gradient
+    const grad = ctx.createLinearGradient(0, 0, 600, 380);
+    grad.addColorStop(0, "#fdf6f0"); grad.addColorStop(0.5, "#fce8e8"); grad.addColorStop(1, "#eef5ef");
+    ctx.fillStyle = grad; ctx.fillRect(0, 0, 600, 380);
+
+    // Decorative circles
+    ctx.beginPath(); ctx.arc(50, 50, 80, 0, Math.PI * 2);
+    ctx.fillStyle = "rgba(192,112,128,0.07)"; ctx.fill();
+    ctx.beginPath(); ctx.arc(560, 340, 100, 0, Math.PI * 2);
+    ctx.fillStyle = "rgba(122,158,126,0.07)"; ctx.fill();
+
+    // Music notes watermark
+    ctx.font = "bold 60px serif"; ctx.fillStyle = "rgba(192,112,128,0.12)";
+    ctx.fillText("♪", 30, 200); ctx.fillText("♫", 520, 120);
+    ctx.font = "bold 40px serif"; ctx.fillText("♩", 540, 300); ctx.fillText("♬", 20, 320);
+
+    // Logo icon (circle)
+    ctx.beginPath(); ctx.arc(80, 60, 32, 0, Math.PI * 2);
+    ctx.fillStyle = "rgba(192,112,128,0.15)"; ctx.fill();
+    ctx.font = "28px serif"; ctx.fillStyle = "#c07080";
+    ctx.textAlign = "center"; ctx.fillText("♫", 80, 70);
+
+    // App name
+    ctx.textAlign = "left";
+    ctx.font = "italic bold 28px serif"; ctx.fillStyle = "#3d2010";
+    ctx.fillText("Music Together", 124, 72);
+
+    // Divider line
+    ctx.beginPath(); ctx.moveTo(60, 110); ctx.lineTo(540, 110);
+    ctx.strokeStyle = "rgba(192,112,128,0.2)"; ctx.lineWidth = 1; ctx.stroke();
+
+    // Room code
+    ctx.textAlign = "center";
+    ctx.font = "16px system-ui"; ctx.fillStyle = "rgba(100,60,40,0.5)";
+    ctx.fillText("MÃ PHÒNG", 300, 160);
+    ctx.font = "bold 72px monospace"; ctx.fillStyle = "#c07080";
+    ctx.letterSpacing = "0.3em";
+    ctx.fillText(roomId, 300, 240);
+    ctx.letterSpacing = "0";
+
+    // Host info
+    ctx.font = "16px system-ui"; ctx.fillStyle = "rgba(100,60,40,0.55)";
+    ctx.fillText(`Tạo bởi ${hostName}`, 300, 280);
+
+    // Join link
+    ctx.font = "13px monospace"; ctx.fillStyle = "rgba(100,60,40,0.4)";
+    ctx.fillText(`${window.location.origin}/room/${roomId}`, 300, 345);
+
+    // Border
+    ctx.strokeStyle = "rgba(192,112,128,0.25)"; ctx.lineWidth = 2;
+    ctx.roundRect(8, 8, 584, 364, 20); ctx.stroke();
+
+    setDrawn(true);
+  }, [roomId, hostName]);
+
+  const download = () => {
+    const a = document.createElement("a");
+    a.href = canvasRef.current!.toDataURL("image/png");
+    a.download = `music-together-${roomId}.png`;
+    a.click();
+  };
+
+  return (
+    <ModalBase title="Bưu thiếp phòng" onClose={onClose}>
+      <p className="text-sm text-muted-foreground mb-4">Tải về và chia sẻ bưu thiếp phòng này với bạn bè</p>
+      <div className="rounded-2xl overflow-hidden border border-primary/10 shadow-sm">
+        <canvas ref={canvasRef} className="w-full h-auto" />
+      </div>
+      {drawn && (
+        <button onClick={download}
+          className="mt-4 w-full flex items-center justify-center gap-2 py-3 bg-primary text-white rounded-2xl font-medium hover:bg-primary/90 transition-colors">
+          <Download className="w-4 h-4" /> Tải về
+        </button>
+      )}
+    </ModalBase>
+  );
+}
+
+/* ──────────────── Theme Modal ──────────────── */
+function ThemeModal({ currentTheme, onSelect, onClose }: { currentTheme: string; onSelect: (id: string) => void; onClose: () => void }) {
+  return (
+    <ModalBase title="Giao diện phòng" onClose={onClose}>
+      <p className="text-sm text-muted-foreground mb-4">Chọn màu nền yêu thích của bạn</p>
+      <div className="grid grid-cols-3 gap-3">
+        {THEMES.map(t => (
+          <button key={t.id} onClick={() => { onSelect(t.id); onClose(); }}
+            className={`flex flex-col items-center gap-2 p-3 rounded-2xl border-2 transition-all hover:scale-105 ${currentTheme === t.id ? 'border-primary shadow-md' : 'border-primary/10 hover:border-primary/30'}`}>
+            <div className="flex gap-1">
+              {t.colors.map((c, i) => <div key={i} className="w-5 h-5 rounded-full border border-white/50 shadow-sm" style={{ background: c }} />)}
+            </div>
+            <span className="text-xs font-medium text-foreground/70">{t.name}</span>
+            {currentTheme === t.id && <Check className="w-3 h-3 text-primary" />}
+          </button>
+        ))}
+      </div>
+    </ModalBase>
+  );
+}
+
+/* ──────────────── Settings Modal ──────────────── */
+function SettingsModal({ roomId, hostName, listeners, onClose }: { roomId: string; hostName: string; listeners: string[]; onClose: () => void }) {
+  return (
+    <ModalBase title="Cài đặt phòng" onClose={onClose}>
+      <div className="space-y-3">
+        <InfoRow label="Mã phòng" value={roomId} mono />
+        <InfoRow label="Chủ phòng" value={hostName} />
+        <InfoRow label="Thành viên" value={`${listeners.length} người`} />
+      </div>
+    </ModalBase>
+  );
+}
+
+function InfoRow({ label, value, mono = false }: { label: string; value: string; mono?: boolean }) {
+  return (
+    <div className="flex items-center justify-between p-3 bg-primary/5 rounded-2xl">
+      <span className="text-sm text-muted-foreground">{label}</span>
+      <span className={`text-sm font-semibold text-foreground ${mono ? 'font-mono tracking-wider' : ''}`}>{value}</span>
+    </div>
+  );
+}
+
+/* ──────────────── Modal Base ──────────────── */
+function ModalBase({ title, children, onClose }: { title: string; children: React.ReactNode; onClose: () => void }) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/30 backdrop-blur-sm animate-in fade-in duration-200">
+      <div className="bg-white/95 rounded-3xl shadow-2xl w-full max-w-md p-6 relative animate-in zoom-in-95 duration-200">
+        <div className="flex items-center justify-between mb-5">
+          <h2 className="text-lg font-serif italic font-semibold text-foreground">{title}</h2>
+          <button onClick={onClose} className="w-8 h-8 rounded-xl hover:bg-primary/10 flex items-center justify-center text-muted-foreground transition-colors">
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+        {children}
+      </div>
+    </div>
+  );
+}
+
+/* ──────────────── Toolbar Button ──────────────── */
+function ToolBtn({ icon: Icon, label, onClick, active = false, accent = false, disabled = false, title }: {
+  icon: any; label: string; onClick: () => void; active?: boolean; accent?: boolean; disabled?: boolean; title?: string;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      disabled={disabled}
+      title={title ?? label}
+      className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium transition-all whitespace-nowrap select-none
+        ${accent ? 'bg-[#f5922f] hover:bg-[#e07a20] text-white shadow-sm' :
+          active ? 'bg-primary/15 text-primary border border-primary/20' :
+          'text-muted-foreground hover:bg-primary/8 hover:text-primary'}
+        ${disabled ? 'opacity-40 cursor-not-allowed' : ''}`}
+    >
+      <Icon className="w-3.5 h-3.5 flex-shrink-0" />
+      <span className="hidden lg:inline">{label}</span>
+    </button>
+  );
+}
+
+/* ──────────────── Main Room Page ──────────────── */
 export default function Room() {
   const params = useParams();
   const roomId = params.roomId as string;
   const [, setLocation] = useLocation();
   const { toast } = useToast();
-  
+
   const [userName, setUserName] = useState<string | null>(null);
-  const [isChatOpen, setIsChatOpen] = useState(true);
   const [volume, setVolume] = useState(80);
   const [playerCurrentTime, setPlayerCurrentTime] = useState(0);
   const [playerDuration, setPlayerDuration] = useState(0);
-  
+
+  // Toolbar state
+  const [compact, setCompact] = useState(false);
+  const [coffeeBreak, setCoffeeBreak] = useState(false);
+  const [hostActive, setHostActive] = useState(true);
+  const [themeId, setThemeId] = useState("cream");
+
+  // Modal state
+  const [shareOpen, setShareOpen] = useState(false);
+  const [postcardOpen, setPostcardOpen] = useState(false);
+  const [themeOpen, setThemeOpen] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
+
+  // Activity log
+  const [activities, setActivities] = useState<{ text: string; time: string }[]>([]);
+
+  const addActivity = useCallback((text: string) => {
+    setActivities(a => [...a, { text, time: nowTime() }]);
+  }, []);
+
   useEffect(() => {
     const name = sessionStorage.getItem("music-together-name");
-    if (!name) {
-      toast({
-        title: "Cần nhập tên",
-        description: "Vui lòng nhập tên trước khi vào phòng.",
-        variant: "destructive"
-      });
-      setLocation("/");
-      return;
-    }
+    if (!name) { setLocation("/"); return; }
     setUserName(name);
-  }, [setLocation, toast]);
+  }, [setLocation]);
 
-  const { data: roomInfo, isLoading: isLoadingRoom, error: roomError } = useGetRoom(roomId, {
+  const { data: _roomInfo, isLoading: isLoadingRoom, error: roomError } = useGetRoom(roomId, {
     query: { enabled: !!roomId, queryKey: getGetRoomQueryKey(roomId) }
   });
 
-  const { roomState, connected, error: wsError, sendAction } = useWebSocket(roomId, userName);
+  const { roomState, connected, sendAction } = useWebSocket(roomId, userName);
 
-  // Save recent room to localStorage once hostName is known
+  const prevListenersRef = useRef<string[]>([]);
   useEffect(() => {
-    if (roomState?.hostName && roomId) {
-      saveRecentRoom(roomId, roomState.hostName);
-    }
+    if (!roomState) return;
+    const prev = prevListenersRef.current;
+    const curr = roomState.listeners;
+    curr.filter(l => !prev.includes(l)).forEach(l => addActivity(`${l} đã vào phòng`));
+    prev.filter(l => !curr.includes(l)).forEach(l => addActivity(`${l} đã rời phòng`));
+    prevListenersRef.current = curr;
+  }, [roomState?.listeners, addActivity]);
+
+  useEffect(() => {
+    if (roomState?.hostName && roomId) saveRecentRoom(roomId, roomState.hostName);
   }, [roomId, roomState?.hostName]);
 
   useEffect(() => {
-    if (roomError) {
-      toast({
-        title: "Phòng không tìm thấy",
-        description: "Phòng này không tồn tại hoặc đã bị đóng.",
-        variant: "destructive"
-      });
-      setLocation("/");
-    }
+    if (roomError) { toast({ title: "Phòng không tìm thấy", variant: "destructive" }); setLocation("/"); }
   }, [roomError, setLocation, toast]);
 
-  const isHost = roomState?.hostName === userName;
+  const isHost = hostActive && roomState?.hostName === userName;
+  const currentTheme = THEMES.find(t => t.id === themeId) ?? THEMES[0];
 
-  const handleCopyLink = () => {
-    navigator.clipboard.writeText(window.location.href);
-    toast({
-      title: "Đã sao chép link!",
-      description: "Chia sẻ link này để mời bạn bè vào cùng.",
-    });
-  };
-
-  const handleLeave = () => {
-    sessionStorage.removeItem("music-together-name");
-    setLocation("/");
-  };
-
+  /* handlers */
   const handleAddTrack = (track: Track) => {
     sendAction({ type: "add_track", track });
+    addActivity(`${userName} đã thêm "${track.title}"`);
   };
-
-  const handleRemoveTrack = (index: number) => {
-    sendAction({ type: "remove_track", index });
-  };
-
-  const handlePlayTrack = (index: number) => {
-    sendAction({ type: "play_track", index });
-  };
-
-  const handleSeek = (time: number) => {
-    sendAction({ type: "seek", currentTime: time });
-  };
-
-  const handleVolumeChange = (vol: number) => {
-    setVolume(vol);
-  };
-
-  const handleTimeUpdate = (currentTime: number, duration: number) => {
-    setPlayerCurrentTime(currentTime);
-    setPlayerDuration(duration);
-  };
-
+  const handleRemoveTrack = (i: number) => sendAction({ type: "remove_track", index: i });
+  const handlePlayTrack = (i: number) => sendAction({ type: "play_track", index: i });
+  const handleSeek = (time: number) => sendAction({ type: "seek", currentTime: time });
   const handlePlayPause = () => {
     if (!roomState) return;
-    sendAction({ 
-      type: "play_pause", 
-      playing: !roomState.playing, 
-      currentTime: roomState.currentTime 
-    });
+    sendAction({ type: "play_pause", playing: !roomState.playing, currentTime: roomState.currentTime });
   };
-
-  const handleSkip = () => {
-    sendAction({ type: "skip" });
-  };
-
-  const handlePrev = () => {
-    sendAction({ type: "prev_track" });
-  };
-
-  const handleRepeat = () => {
-    sendAction({ type: "set_repeat" });
-  };
-
-  const handleShuffle = () => {
-    sendAction({ type: "set_shuffle" });
-  };
-
+  const handleSkip = () => sendAction({ type: "skip" });
+  const handlePrev = () => sendAction({ type: "prev_track" });
+  const handleRepeat = () => sendAction({ type: "set_repeat" });
+  const handleShuffle = () => sendAction({ type: "set_shuffle" });
   const handlePlayerStateChange = (playing: boolean, currentTime: number) => {
     if (!isHost) return;
     sendAction({ type: "seek", currentTime });
   };
+  const handleTrackEnd = () => { if (isHost) handleSkip(); };
+  const handleSendMessage = (text: string) => sendAction({ type: "chat", text });
+  const handleLeave = () => { sessionStorage.removeItem("music-together-name"); setLocation("/"); };
 
-  const handleTrackEnd = () => {
-    if (isHost) {
-      handleSkip();
-    }
-  };
+  if (isLoadingRoom || !userName) return (
+    <div className="min-h-screen w-full flex items-center justify-center bg-background">
+      <Loader2 className="w-8 h-8 animate-spin text-primary" />
+    </div>
+  );
 
-  const handleSendMessage = (text: string) => {
-    sendAction({ type: "chat", text });
-  };
-
-  if (isLoadingRoom || !userName) {
-    return (
-      <div className="min-h-screen w-full flex items-center justify-center bg-background">
-        <Loader2 className="w-8 h-8 animate-spin text-primary" />
-      </div>
-    );
-  }
+  const showPlayer = !!roomState?.currentTrack && !coffeeBreak;
 
   return (
-    <div className="h-screen overflow-hidden w-full bg-background flex flex-col petal-bg font-sans">
-      {/* Header */}
-      <header className="h-20 border-b border-primary/5 bg-white/40 backdrop-blur-md flex items-center justify-between px-8 shrink-0 z-20 sticky top-0">
-        <div className="flex items-center gap-4">
-          <button
-            onClick={() => setLocation("/")}
-            className="w-10 h-10 rounded-2xl bg-primary/10 flex items-center justify-center border border-primary/20 soft-glow hover:bg-primary/20 transition-colors"
-            title="Về trang chủ"
-          >
-            <Music className="w-5 h-5 text-primary" />
-          </button>
-          <h1 className="font-serif text-2xl tracking-tight hidden sm:block italic font-medium text-foreground">Music Together</h1>
-          <div className="h-6 w-px bg-primary/10 mx-2 hidden sm:block"></div>
-          <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground bg-primary/5 px-4 py-1.5 rounded-full border border-primary/10">
-            <span className={`w-2 h-2 rounded-full ${connected ? 'bg-primary animate-pulse' : 'bg-red-400'}`}></span>
-            {connected ? 'Đang phát trực tiếp' : 'Đang kết nối lại...'}
+    <div className={`h-screen overflow-hidden w-full flex flex-col font-sans bg-gradient-to-br ${currentTheme.bg} relative`}>
+      {/* Petal BG dots */}
+      <div className="absolute inset-0 pointer-events-none opacity-30" style={{
+        backgroundImage: `radial-gradient(circle at 20% 50%, ${currentTheme.colors[1]}22 0%, transparent 50%),
+          radial-gradient(circle at 80% 20%, ${currentTheme.colors[2]}22 0%, transparent 50%)`
+      }} />
+
+      {/* ── Header ──────────────────────────── */}
+      <header className="h-14 bg-white/50 backdrop-blur-md border-b border-white/40 flex items-center px-4 gap-2 shrink-0 z-30 shadow-sm">
+        {/* Logo */}
+        <button onClick={() => setLocation("/")}
+          className="w-9 h-9 rounded-2xl flex items-center justify-center border border-primary/20 hover:bg-primary/10 transition-colors shrink-0"
+          style={{ background: `${currentTheme.colors[0]}cc` }}>
+          <Music className="w-4.5 h-4.5 text-primary" />
+        </button>
+
+        {/* Language */}
+        <button className="flex items-center gap-1 px-2 py-1 rounded-xl text-xs text-muted-foreground hover:bg-primary/5 transition-colors hidden sm:flex shrink-0">
+          <Globe className="w-3.5 h-3.5" />
+          <span>Tiếng Việt</span>
+        </button>
+
+        {/* User info */}
+        <div className="flex items-center gap-2 px-3 py-1.5 bg-white/60 rounded-xl border border-primary/10 text-xs shrink-0">
+          <div className="w-5 h-5 rounded-full bg-primary/20 flex items-center justify-center text-[10px] font-bold text-primary">
+            {userName.charAt(0).toUpperCase()}
           </div>
+          <span className="font-medium text-foreground/80 hidden sm:inline">{userName}</span>
+          <span className="text-muted-foreground/50 hidden sm:inline">·</span>
+          <span className="font-mono font-bold text-foreground/60">{roomId}</span>
+          <span className="text-muted-foreground/50">·</span>
+          <Users className="w-3 h-3 text-muted-foreground/50" />
+          <span className="text-muted-foreground/70">{roomState?.listeners.length ?? 0}</span>
+          {roomState?.hostName === userName && (
+            <span className="text-[10px] font-bold text-[#f5922f] border border-[#f5922f]/30 px-1.5 py-0.5 rounded-full">HOST</span>
+          )}
         </div>
 
-        <div className="flex items-center gap-6">
-          {roomState && (
-            <div className="flex -space-x-3 mr-2">
-              {roomState.listeners.slice(0, 4).map((listener, i) => (
-                <div key={i} className="w-10 h-10 rounded-full bg-card border-2 border-white flex items-center justify-center text-xs font-semibold text-primary shadow-sm relative group transition-transform hover:-translate-y-1" title={listener}>
-                  {listener.charAt(0).toUpperCase()}
-                  {listener === roomState.hostName && (
-                    <span className="absolute -top-1 -right-1 w-4 h-4 bg-primary rounded-full border-2 border-white flex items-center justify-center">
-                      <div className="w-1.5 h-1.5 bg-white rounded-full"></div>
-                    </span>
-                  )}
-                </div>
-              ))}
-              {roomState.listeners.length > 4 && (
-                <div className="w-10 h-10 rounded-full bg-muted border-2 border-white flex items-center justify-center text-xs font-bold text-muted-foreground shadow-sm">
-                  +{roomState.listeners.length - 4}
-                </div>
-              )}
-            </div>
-          )}
-          
-          <Button variant="ghost" size="sm" className="hidden sm:flex gap-2 text-primary hover:bg-primary/5 font-medium rounded-xl" onClick={handleCopyLink}>
-            <Copy className="w-4 h-4" />
-            Sao chép link
-          </Button>
+        {/* Status */}
+        <div className="hidden md:flex items-center gap-1.5 text-xs text-muted-foreground/60 px-2">
+          <span className={`w-1.5 h-1.5 rounded-full ${connected ? 'bg-green-400 animate-pulse' : 'bg-red-400'}`} />
+          {connected ? 'Live' : 'Reconnecting...'}
+        </div>
 
-          <Button
-            variant="ghost"
-            size="icon"
-            className={`rounded-xl transition-all ${isChatOpen ? 'text-primary bg-primary/10' : 'text-muted-foreground hover:text-primary hover:bg-primary/5'}`}
-            onClick={() => setIsChatOpen(o => !o)}
-            title={isChatOpen ? 'Ẩn chat' : 'Hiện chat'}
-          >
-            {isChatOpen ? <MessageSquare className="w-5 h-5" /> : <MessageSquareOff className="w-5 h-5" />}
-          </Button>
-          
-          <Button variant="ghost" size="icon" className="text-muted-foreground hover:text-primary hover:bg-primary/5 rounded-xl" onClick={handleLeave}>
-            <LogOut className="w-5 h-5" />
-          </Button>
+        {/* Spacer */}
+        <div className="flex-1" />
+
+        {/* Toolbar buttons */}
+        <div className="flex items-center gap-1 overflow-x-auto">
+          <ToolBtn icon={Minimize2} label="Thu gọn" onClick={() => setCompact(c => !c)} active={compact} />
+          <ToolBtn icon={Share2} label="Chia sẻ" onClick={() => setShareOpen(true)} />
+          <ToolBtn icon={CreditCard} label="Bưu thiếp phòng" onClick={() => setPostcardOpen(true)} />
+          <ToolBtn icon={Palette} label="Giao diện phòng" onClick={() => setThemeOpen(true)} />
+          <ToolBtn icon={Coffee} label="Tách cafe" onClick={() => setCoffeeBreak(c => !c)} accent={coffeeBreak} active={coffeeBreak} />
+          <ToolBtn
+            icon={UserCheck}
+            label={hostActive ? "Dẫn chủ ON" : "Dẫn chủ OFF"}
+            onClick={() => setHostActive(a => !a)}
+            active={hostActive}
+            disabled={roomState?.hostName !== userName}
+          />
+          <ToolBtn icon={Settings} label="Cài đặt" onClick={() => setSettingsOpen(true)} />
+          <ToolBtn icon={LogOut} label="Rời phòng" onClick={handleLeave} />
         </div>
       </header>
 
-      {/* Main Content */}
-      <main className="flex-1 overflow-hidden flex flex-col lg:flex-row p-6 gap-6 z-10 relative min-h-0">
-        <div className="absolute top-0 right-0 w-[40%] h-[40%] bg-primary/5 rounded-full blur-[120px] pointer-events-none -z-10"></div>
-        <div className="absolute bottom-0 left-0 w-[30%] h-[30%] bg-secondary/5 rounded-full blur-[100px] pointer-events-none -z-10"></div>
-        
-        {/* Left Column: Player & Controls */}
-        <div className="flex-1 flex flex-col gap-6 min-w-0 max-w-5xl mx-auto w-full overflow-y-auto min-h-0">
-          <div className="w-full">
-            <YoutubePlayer 
-              currentTrack={roomState?.currentTrack || null}
-              playing={roomState?.playing || false}
-              serverTime={roomState?.currentTime || 0}
-              isHost={isHost}
-              volume={volume}
-              onStateChange={handlePlayerStateChange}
-              onTrackEnd={handleTrackEnd}
-              onTimeUpdate={handleTimeUpdate}
-            />
-            
-            <PlayerControls 
-              isHost={isHost}
-              playing={roomState?.playing || false}
-              currentTime={playerCurrentTime}
-              duration={playerDuration}
-              volume={volume}
-              repeatMode={roomState?.repeatMode ?? 'all'}
-              shuffle={roomState?.shuffle ?? false}
-              onPlayPause={handlePlayPause}
-              onSkip={handleSkip}
-              onPrev={handlePrev}
-              onSeek={handleSeek}
-              onVolumeChange={handleVolumeChange}
-              onRepeat={handleRepeat}
-              onShuffle={handleShuffle}
-              disabled={!roomState?.currentTrack}
-            />
-          </div>
-          
-          <div className="flex-1 min-h-[400px] flex flex-col md:flex-row gap-6">
-            <div className="flex-1 min-h-[400px] h-full">
-              <PlaylistPanel 
-                playlist={roomState?.playlist || []}
-                currentTrack={roomState?.currentTrack || null}
-                onRemoveTrack={handleRemoveTrack}
-                onPlayTrack={handlePlayTrack}
-                isHost={isHost}
-              />
-            </div>
-            <div className="flex-1 min-h-[400px] h-full">
-              <SearchPanel onAddTrack={handleAddTrack} />
-            </div>
-          </div>
-        </div>
+      {/* ── Main ──────────────────────────────── */}
+      <div className="flex-1 flex overflow-hidden min-h-0">
 
-        {/* Right Column: Chat (toggleable) */}
-        {isChatOpen && (
-          <div className="w-full lg:w-[300px] xl:w-[340px] h-[400px] lg:h-auto shrink-0 flex flex-col min-h-0">
-            <ChatPanel 
-              messages={roomState?.chatHistory || []}
-              onSendMessage={handleSendMessage}
-              currentUser={userName || ""}
-            />
+        {/* Left: Player area */}
+        {!compact && (
+          <div className="flex-1 flex flex-col min-w-0 overflow-y-auto min-h-0 p-5 gap-4">
+            {coffeeBreak ? (
+              <div className="flex-1 flex flex-col items-center justify-center gap-6 animate-in fade-in duration-500">
+                <div className="text-6xl animate-bounce">☕</div>
+                <div className="text-center">
+                  <h2 className="text-2xl font-serif italic font-semibold text-foreground/70">Đang nghỉ giải lao</h2>
+                  <p className="text-sm text-muted-foreground/60 mt-2">Nhạc tạm dừng. Nhấn "Tách cafe" lần nữa để tiếp tục.</p>
+                </div>
+                <button onClick={() => setCoffeeBreak(false)}
+                  className="px-8 py-3 bg-[#f5922f] text-white rounded-2xl font-medium hover:bg-[#e07a20] transition-colors shadow-md">
+                  Tiếp tục nghe nhạc
+                </button>
+              </div>
+            ) : showPlayer ? (
+              <>
+                <YoutubePlayer
+                  currentTrack={roomState?.currentTrack || null}
+                  playing={roomState?.playing || false}
+                  serverTime={roomState?.currentTime || 0}
+                  isHost={isHost}
+                  volume={volume}
+                  onStateChange={handlePlayerStateChange}
+                  onTrackEnd={handleTrackEnd}
+                  onTimeUpdate={(ct, dur) => { setPlayerCurrentTime(ct); setPlayerDuration(dur); }}
+                />
+                <PlayerControls
+                  isHost={isHost}
+                  playing={roomState?.playing || false}
+                  currentTime={playerCurrentTime}
+                  duration={playerDuration}
+                  volume={volume}
+                  repeatMode={roomState?.repeatMode ?? 'all'}
+                  shuffle={roomState?.shuffle ?? false}
+                  onPlayPause={handlePlayPause}
+                  onSkip={handleSkip}
+                  onPrev={handlePrev}
+                  onSeek={handleSeek}
+                  onVolumeChange={setVolume}
+                  onRepeat={handleRepeat}
+                  onShuffle={handleShuffle}
+                  disabled={!roomState?.currentTrack}
+                />
+              </>
+            ) : (
+              <>
+                <WaitingIllustration />
+                {roomState?.currentTrack && (
+                  <PlayerControls
+                    isHost={isHost}
+                    playing={roomState.playing}
+                    currentTime={playerCurrentTime}
+                    duration={playerDuration}
+                    volume={volume}
+                    repeatMode={roomState.repeatMode ?? 'all'}
+                    shuffle={roomState.shuffle ?? false}
+                    onPlayPause={handlePlayPause}
+                    onSkip={handleSkip}
+                    onPrev={handlePrev}
+                    onSeek={handleSeek}
+                    onVolumeChange={setVolume}
+                    onRepeat={handleRepeat}
+                    onShuffle={handleShuffle}
+                    disabled={false}
+                  />
+                )}
+              </>
+            )}
           </div>
         )}
-      </main>
+
+        {/* Right: Panel */}
+        <div className={`${compact ? 'flex-1' : 'w-[340px] xl:w-[380px]'} flex flex-col min-h-0 shrink-0`}>
+          <RightPanel
+            playlist={roomState?.playlist || []}
+            currentTrack={roomState?.currentTrack || null}
+            chatMessages={roomState?.chatHistory || []}
+            isHost={isHost}
+            currentUser={userName}
+            onAddTrack={handleAddTrack}
+            onRemoveTrack={handleRemoveTrack}
+            onPlayTrack={handlePlayTrack}
+            onSendMessage={handleSendMessage}
+            activities={activities}
+          />
+        </div>
+      </div>
+
+      {/* ── Modals ──────────────────────────── */}
+      {shareOpen    && <ShareModal    roomId={roomId} onClose={() => setShareOpen(false)} />}
+      {postcardOpen && <PostcardModal roomId={roomId} hostName={roomState?.hostName ?? ""} onClose={() => setPostcardOpen(false)} />}
+      {themeOpen    && <ThemeModal    currentTheme={themeId} onSelect={setThemeId} onClose={() => setThemeOpen(false)} />}
+      {settingsOpen && <SettingsModal roomId={roomId} hostName={roomState?.hostName ?? ""} listeners={roomState?.listeners ?? []} onClose={() => setSettingsOpen(false)} />}
     </div>
   );
 }
