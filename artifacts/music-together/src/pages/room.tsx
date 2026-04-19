@@ -892,6 +892,7 @@ export default function Room() {
                   serverTime={roomState?.currentTime || 0}
                   isHost={effectiveIsHost}
                   volume={volume}
+                  fullscreen={fullscreen}
                   onStateChange={handlePlayerStateChange}
                   onTrackEnd={handleTrackEnd}
                   onTimeUpdate={(ct, dur) => { setPlayerCurrentTime(ct); setPlayerDuration(dur); }}
@@ -927,7 +928,7 @@ export default function Room() {
                 {/* Exit button top-right */}
                 <button
                   onClick={() => setFullscreen(false)}
-                  className="absolute top-4 right-4 z-10 w-10 h-10 rounded-full bg-black/50 hover:bg-black/70 text-white flex items-center justify-center transition-colors backdrop-blur-sm"
+                  className="absolute top-4 right-4 z-[250] w-10 h-10 rounded-full bg-black/50 hover:bg-black/70 text-white flex items-center justify-center transition-colors backdrop-blur-sm"
                   title="Thoát toàn màn hình">
                   <Minimize2 className="w-4 h-4" />
                 </button>

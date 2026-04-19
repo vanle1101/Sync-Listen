@@ -14,6 +14,7 @@ interface YoutubePlayerProps {
   serverTime: number;
   isHost: boolean;
   volume: number;
+  fullscreen?: boolean;
   onStateChange?: (playing: boolean, currentTime: number) => void;
   onTrackEnd?: () => void;
   onTimeUpdate?: (currentTime: number, duration: number) => void;
@@ -25,6 +26,7 @@ export function YoutubePlayer({
   serverTime,
   isHost,
   volume,
+  fullscreen = false,
   onStateChange,
   onTrackEnd,
   onTimeUpdate,
@@ -327,13 +329,15 @@ export function YoutubePlayer({
   }, [isHost, isReady]);
 
   return (
-    <div className="relative w-full pt-[56.25%] bg-white rounded-[2rem] overflow-hidden border border-primary/10 group shadow-2xl soft-glow">
+    <div className={fullscreen
+      ? "absolute inset-0 bg-black group"
+      : "relative w-full pt-[56.25%] bg-white rounded-[2rem] overflow-hidden border border-primary/10 group shadow-2xl soft-glow"}>
       {/* YouTube player — hidden when no track to avoid black background */}
       <div
         className="absolute inset-0 z-0 pointer-events-none opacity-90 group-hover:opacity-100 transition-opacity duration-700"
         style={{ visibility: currentTrack ? 'visible' : 'hidden' }}
       >
-        <div ref={containerRef} id="youtube-player" className="w-full h-full scale-[1.1]"></div>
+        <div ref={containerRef} id="youtube-player" className={`w-full h-full ${fullscreen ? "" : "scale-[1.1]"}`}></div>
       </div>
 
       {/* Cute placeholder when no track */}
@@ -370,9 +374,9 @@ export function YoutubePlayer({
         </div>
       )}
 
-      <div className="absolute inset-0 z-20 pointer-events-auto bg-transparent"></div>
+      {!fullscreen && <div className="absolute inset-0 z-20 pointer-events-auto bg-transparent"></div>}
 
-      {currentTrack && (
+      {currentTrack && !fullscreen && (
         <div className="absolute bottom-0 left-0 right-0 p-8 z-30 bg-gradient-to-t from-white/95 via-white/60 to-transparent pointer-events-none backdrop-blur-[2px]">
           <div className="flex items-end gap-6">
             {currentTrack.thumbnail && (
