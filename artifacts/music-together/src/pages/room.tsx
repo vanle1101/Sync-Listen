@@ -11,7 +11,7 @@ import { RightPanel } from "@/components/right-panel";
 import {
   Music, Loader2, Copy, LogOut, Minimize2, Maximize2, Share2, CreditCard,
   Palette, Coffee, Settings, Globe, Users, X, Download, Check, Heart, ImagePlus, Power, Lock, Eye, EyeOff,
-  MessageCircle, Send, ChevronDown, Play, Pause, SkipForward
+  MessageCircle, Send, ChevronDown, Play, Pause, SkipForward, Menu
 } from "lucide-react";
 import { useGetRoom, getGetRoomQueryKey } from "@workspace/api-client-react";
 
@@ -649,6 +649,9 @@ export default function Room() {
   const [playerCurrentTime, setPlayerCurrentTime] = useState(0);
   const [playerDuration, setPlayerDuration] = useState(0);
 
+  // Mobile: toggle between player view and menu/playlist view
+  const [mobileShowPlayer, setMobileShowPlayer] = useState(false);
+
   // Toolbar state
   const [compact, setCompact] = useState(false);
   const [fullscreen, setFullscreen] = useState(false);
@@ -872,6 +875,17 @@ export default function Room() {
         {/* Spacer */}
         <div className="flex-1" />
 
+        {/* Mobile: hamburger toggle (show/hide player vs menu) */}
+        <button
+          onClick={() => setMobileShowPlayer(v => !v)}
+          className="md:hidden w-9 h-9 rounded-xl flex items-center justify-center shrink-0 transition-all active:scale-95"
+          style={mobileShowPlayer
+            ? { background: "rgba(192,112,128,0.12)", color: "#c07080" }
+            : { color: "rgba(74,48,40,0.5)" }}
+          title={mobileShowPlayer ? "Xem danh sách phát" : "Xem video"}>
+          <Menu className="w-4 h-4" />
+        </button>
+
         {/* Toolbar */}
         <div className="flex items-center gap-0.5 shrink-0 overflow-x-auto">
           <div className="hidden md:contents">
@@ -908,7 +922,7 @@ export default function Room() {
         {(!compact || fullscreen) && (
           <div className={fullscreen
             ? "fixed inset-0 z-[200] bg-black flex flex-col"
-            : "hidden md:flex flex-1 flex-col min-w-0 overflow-y-auto min-h-0 p-5 gap-4"}>
+            : `${mobileShowPlayer ? "flex" : "hidden"} md:flex flex-1 flex-col min-w-0 overflow-y-auto min-h-0 p-5 gap-4`}>
 
             {/* YouTube player */}
             {showPlayer ? (
@@ -1025,7 +1039,7 @@ export default function Room() {
         )}
 
         {/* Right: Panel */}
-        <div className={`${compact ? 'flex-1' : 'w-full md:w-[340px] xl:w-[380px]'} flex flex-col min-h-0 shrink-0`}>
+        <div className={`${compact ? 'flex-1' : `${mobileShowPlayer ? 'hidden' : 'flex'} md:flex w-full md:w-[340px] xl:w-[380px]`} flex-col min-h-0 shrink-0`}>
           <RightPanel
             playlist={roomState?.playlist || []}
             playedTracks={roomState?.playedTracks || []}
@@ -1047,8 +1061,8 @@ export default function Room() {
         </div>
       </div>
 
-      {/* ── Mobile mini-player bar (hidden on desktop) ── */}
-      {!fullscreen && roomState?.currentTrack && (
+      {/* ── Mobile mini-player bar (hidden on desktop, hidden when player is visible) ── */}
+      {!fullscreen && !mobileShowPlayer && roomState?.currentTrack && (
         <div className="md:hidden shrink-0 flex items-center gap-3 px-3 py-2.5 bg-white/85 backdrop-blur-md border-t border-primary/10 shadow-[0_-4px_20px_rgba(192,112,128,0.1)]">
           {/* Thumbnail */}
           <div className="relative w-11 h-11 rounded-xl overflow-hidden shrink-0 shadow-sm">
