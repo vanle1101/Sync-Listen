@@ -208,6 +208,10 @@ function PlaylistTab({ playlist, playedTracks, currentTrack, isHost, onAddTrack,
   const [addedIds, setAddedIds] = useState<Set<string>>(new Set());
   const [mode, setMode] = useState<"queue" | "search">("queue");
 
+  useEffect(() => {
+    if (!isHost) { setMode("queue"); setQuery(""); setSearchQuery(""); }
+  }, [isHost]);
+
   const { data: results, isLoading } = useYoutubeSearch(
     { q: searchQuery },
     { query: { enabled: !!searchQuery, queryKey: getYoutubeSearchQueryKey({ q: searchQuery }) } }
@@ -226,25 +230,32 @@ function PlaylistTab({ playlist, playedTracks, currentTrack, isHost, onAddTrack,
 
   return (
     <div className="flex flex-col flex-1 min-h-0">
-      <div className="p-3 border-b border-primary/5 bg-white/40 shrink-0">
-        <form onSubmit={handleSearch} className="flex gap-2">
-          <div className="relative flex-1">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-primary/40" />
-            <Input value={query} onChange={e => setQuery(e.target.value)}
-              placeholder="Dán link hoặc nhập tên bài hát..."
-              className="pl-9 h-10 bg-white border-primary/10 rounded-2xl text-sm focus-visible:ring-primary/20 shadow-sm" />
-          </div>
-          <button type="submit"
-            className="w-10 h-10 rounded-2xl bg-primary/10 hover:bg-primary text-primary hover:text-white flex items-center justify-center transition-all shrink-0">
-            <Plus className="w-5 h-5" />
-          </button>
-        </form>
-        {mode === "search" && (
-          <button onClick={clearSearch} className="flex items-center gap-1 text-xs text-primary/60 hover:text-primary mt-2 pl-1 transition-colors">
-            <X className="w-3 h-3" /> Về hàng đợi
-          </button>
-        )}
-      </div>
+      {isHost && (
+        <div className="p-3 border-b border-primary/5 bg-white/40 shrink-0">
+          <form onSubmit={handleSearch} className="flex gap-2">
+            <div className="relative flex-1">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-primary/40" />
+              <Input value={query} onChange={e => setQuery(e.target.value)}
+                placeholder="Dán link hoặc nhập tên bài hát..."
+                className="pl-9 h-10 bg-white border-primary/10 rounded-2xl text-sm focus-visible:ring-primary/20 shadow-sm" />
+            </div>
+            <button type="submit"
+              className="w-10 h-10 rounded-2xl bg-primary/10 hover:bg-primary text-primary hover:text-white flex items-center justify-center transition-all shrink-0">
+              <Plus className="w-5 h-5" />
+            </button>
+          </form>
+          {mode === "search" && (
+            <button onClick={clearSearch} className="flex items-center gap-1 text-xs text-primary/60 hover:text-primary mt-2 pl-1 transition-colors">
+              <X className="w-3 h-3" /> Về hàng đợi
+            </button>
+          )}
+        </div>
+      )}
+      {!isHost && (
+        <div className="px-3 py-2 bg-muted/30 border-b border-primary/5 shrink-0">
+          <p className="text-[11px] text-muted-foreground/50 text-center italic">Chỉ host mới có thể thêm bài khi không có chế độ dân chủ</p>
+        </div>
+      )}
 
       <div className="flex-1 overflow-y-auto min-h-0 p-2">
         {mode === "search" ? (

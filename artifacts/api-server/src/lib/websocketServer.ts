@@ -93,6 +93,7 @@ export function setupWebSocketServer(server: http.Server): void {
         }
 
         case "add_track": {
+          if (!canControl) { sendToSocket(ws, { type: "error", message: "Only host" }); break; }
           const track = msg.track as Track;
           if (!track?.videoId) break;
           logger.info({ roomId: currentRoomId, trackId: track.videoId }, "Track added to queue");
@@ -116,6 +117,7 @@ export function setupWebSocketServer(server: http.Server): void {
         }
 
         case "remove_track": {
+          if (!canControl) { sendToSocket(ws, { type: "error", message: "Only host" }); break; }
           const index = msg.index as number;
           if (typeof index !== "number" || index < 0 || index >= room.playlist.length) break;
           room.playlist.splice(index, 1);
