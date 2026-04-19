@@ -9,7 +9,7 @@ import { PlayerControls } from "@/components/player-controls";
 import { RightPanel } from "@/components/right-panel";
 import {
   Music, Loader2, Copy, LogOut, Minimize2, Share2, CreditCard,
-  Palette, Coffee, UserCheck, Settings, Globe, Users, X, Download, Check, Heart, ImagePlus, Power, Lock, Eye, EyeOff
+  Palette, Coffee, Settings, Globe, Users, X, Download, Check, Heart, ImagePlus, Power, Lock, Eye, EyeOff
 } from "lucide-react";
 import { useGetRoom, getGetRoomQueryKey } from "@workspace/api-client-react";
 
@@ -460,21 +460,25 @@ function ModalBase({ title, children, onClose, scrollable = false }: {
 }
 
 /* ──────────────── Toolbar Button ──────────────── */
-function ToolBtn({ icon: Icon, label, onClick, active = false, accent = false, disabled = false }: {
-  icon: any; label: string; onClick: () => void; active?: boolean; accent?: boolean; disabled?: boolean;
+function ToolBtn({ icon: Icon, label, shortLabel, onClick, active = false, accent = false, disabled = false }: {
+  icon: any; label: string; shortLabel?: string; onClick: () => void; active?: boolean; accent?: boolean; disabled?: boolean;
 }) {
+  const text = shortLabel ?? label;
   return (
     <button
       onClick={onClick}
       disabled={disabled}
       title={label}
-      className={`flex items-center justify-center w-8 h-8 rounded-xl text-xs font-medium transition-all select-none shrink-0
-        ${accent ? 'bg-[#f5922f]/15 hover:bg-[#f5922f]/25 text-[#f5922f]' :
-          active ? 'bg-primary/15 text-primary' :
-          'text-muted-foreground/60 hover:bg-primary/8 hover:text-primary'}
+      className={`flex items-center gap-1 px-2 py-1.5 rounded-xl text-[11px] font-medium transition-all select-none shrink-0 whitespace-nowrap
+        ${accent
+          ? 'bg-[#e87040] hover:bg-[#cf5e30] text-white shadow-sm'
+          : active
+          ? 'bg-primary/12 text-primary border border-primary/20'
+          : 'text-foreground/55 hover:bg-primary/8 hover:text-primary'}
         ${disabled ? 'opacity-30 cursor-not-allowed' : ''}`}
     >
-      <Icon className="w-4 h-4" />
+      <Icon className="w-3.5 h-3.5 shrink-0" />
+      <span className="hidden sm:inline">{text}</span>
     </button>
   );
 }
@@ -620,7 +624,10 @@ export default function Room() {
     if (roomError) { toast({ title: "Phòng không tìm thấy", variant: "destructive" }); setLocation("/"); }
   }, [roomError, setLocation, toast]);
 
-  const isHost = hostActive && roomState?.hostName === userName;
+  const isRealHost = roomState?.hostName === userName;
+  const isHost = hostActive && isRealHost;
+  const democracyMode = roomState?.democracyMode ?? false;
+  const effectiveIsHost = isHost || democracyMode;
   const currentTheme = THEMES.find(t => t.id === themeId) ?? THEMES[0];
 
   /* handlers */
@@ -639,11 +646,12 @@ export default function Room() {
   const handlePrev = () => sendAction({ type: "prev_track" });
   const handleRepeat = () => sendAction({ type: "set_repeat" });
   const handleShuffle = () => sendAction({ type: "set_shuffle" });
+  const handleToggleDemocracy = () => { if (isRealHost) sendAction({ type: "set_democracy" }); };
   const handlePlayerStateChange = (playing: boolean, currentTime: number) => {
-    if (!isHost) return;
+    if (!effectiveIsHost) return;
     sendAction({ type: "seek", currentTime });
   };
-  const handleTrackEnd = () => { if (isHost) handleSkip(); };
+  const handleTrackEnd = () => { if (effectiveIsHost) handleSkip(); };
   const handleSendMessage = (text: string) => sendAction({ type: "chat", text });
   const handleLeave = () => { sessionStorage.removeItem("music-together-name"); setLocation("/"); };
 
@@ -667,65 +675,87 @@ export default function Room() {
       }} />
 
       {/* ── Header ──────────────────────────── */}
-      <header className="h-14 bg-white/50 backdrop-blur-md border-b border-white/40 flex items-center px-4 gap-2 shrink-0 z-30 shadow-sm">
-        {/* Logo */}
+      <header className="bg-white/60 backdrop-blur-md border-b border-white/40 shrink-0 z-30 shadow-sm flex items-center px-3 gap-2 h-[52px]">
+        {/* App logo — orange headphone circle */}
         <button onClick={() => setLocation("/")}
-          className="w-9 h-9 rounded-2xl flex items-center justify-center border border-primary/20 hover:bg-primary/10 transition-colors shrink-0"
-          style={{ background: `${currentTheme.colors[0]}cc` }}>
-          <Music className="w-4.5 h-4.5 text-primary" />
+          title="Về trang chủ"
+          className="w-9 h-9 rounded-2xl flex items-center justify-center shrink-0 shadow-sm transition-transform hover:scale-105 active:scale-95"
+          style={{ background: "linear-gradient(135deg, #e87040, #f5a060)" }}>
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="white" strokeWidth="2.2" strokeLinecap="round">
+            <path d="M3 18v-6a9 9 0 0 1 18 0v6"/>
+            <path d="M21 19a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3z"/>
+            <path d="M3 19a2 2 0 0 0 2 2h1a2 2 0 0 0 2-2v-3a2 2 0 0 0-2-2H3z"/>
+          </svg>
         </button>
 
-        {/* Language */}
-        <button className="flex items-center gap-1 px-2 py-1 rounded-xl text-xs text-muted-foreground hover:bg-primary/5 transition-colors hidden sm:flex shrink-0">
+        {/* Language button */}
+        <button className="hidden md:flex items-center gap-1 px-2 py-1 rounded-xl text-[11px] font-medium text-foreground/55 hover:bg-primary/8 hover:text-primary transition-colors shrink-0 border border-transparent hover:border-primary/15">
           <Globe className="w-3.5 h-3.5" />
           <span>Tiếng Việt</span>
         </button>
 
-        {/* User info */}
-        <div className="flex items-center gap-2 px-3 py-1.5 bg-white/60 rounded-xl border border-primary/10 text-xs shrink-0">
-          <div className="w-5 h-5 rounded-full overflow-hidden bg-primary/20 flex items-center justify-center flex-shrink-0">
-            {myAvatarUrl ? (
-              <img src={myAvatarUrl} alt={userName} className="w-full h-full object-cover" />
-            ) : (
-              <span className="text-[10px] font-bold text-primary">{userName.charAt(0).toUpperCase()}</span>
+        {/* Divider */}
+        <div className="hidden md:block w-px h-6 bg-foreground/10 shrink-0" />
+
+        {/* Room info — 2 rows */}
+        <div className="flex flex-col justify-center min-w-0 shrink-0">
+          {/* Row 1: lock + room name */}
+          <div className="flex items-center gap-1">
+            <Lock className="w-3 h-3 text-foreground/40 shrink-0" />
+            <span className="font-bold text-foreground/85 text-[14px] leading-tight truncate max-w-[140px]">
+              {roomState?.hostName ?? "..."}
+            </span>
+          </div>
+          {/* Row 2: code · listeners · host badge */}
+          <div className="flex items-center gap-1.5 text-[10px] text-foreground/45">
+            <span className="font-mono font-semibold tracking-wide">{roomId}</span>
+            <span className="text-foreground/20">·</span>
+            <Users className="w-2.5 h-2.5" />
+            <span>{roomState?.listeners.length ?? 0}</span>
+            {isRealHost && (
+              <>
+                <span className="text-foreground/20">·</span>
+                <span className="text-[10px] font-bold text-[#e87040]">👑 HOST</span>
+              </>
+            )}
+            {democracyMode && !isRealHost && (
+              <>
+                <span className="text-foreground/20">·</span>
+                <span className="text-[10px] font-semibold text-primary">🗳️ Dân chủ</span>
+              </>
             )}
           </div>
-          <span className="font-medium text-foreground/80 hidden sm:inline">{userName}</span>
-          <span className="text-muted-foreground/50 hidden sm:inline">·</span>
-          <span className="font-mono font-bold text-foreground/60">{roomId}</span>
-          <span className="text-muted-foreground/50">·</span>
-          <Users className="w-3 h-3 text-muted-foreground/50" />
-          <span className="text-muted-foreground/70">{roomState?.listeners.length ?? 0}</span>
-          {roomState?.hostName === userName && (
-            <span className="text-[10px] font-bold text-[#f5922f] border border-[#f5922f]/30 px-1.5 py-0.5 rounded-full">HOST</span>
-          )}
         </div>
 
-        {/* Status */}
-        <div className="hidden md:flex items-center gap-1.5 text-xs text-muted-foreground/60 px-2">
+        {/* Status dot */}
+        <div className="hidden lg:flex items-center gap-1 text-[10px] text-foreground/40 shrink-0">
           <span className={`w-1.5 h-1.5 rounded-full ${connected ? 'bg-green-400 animate-pulse' : 'bg-red-400'}`} />
-          {connected ? 'Live' : 'Reconnecting...'}
+          {connected ? 'Live' : 'Offline'}
         </div>
 
         {/* Spacer */}
         <div className="flex-1" />
 
-        {/* Toolbar buttons — icon only, hover title */}
+        {/* Toolbar */}
         <div className="flex items-center gap-0.5 shrink-0">
-          <ToolBtn icon={Minimize2} label="Thu gọn" onClick={() => setCompact(c => !c)} active={compact} />
-          <ToolBtn icon={Share2} label="Chia sẻ" onClick={() => setShareOpen(true)} />
-          <ToolBtn icon={CreditCard} label="Bưu thiếp phòng" onClick={() => setPostcardOpen(true)} />
-          <ToolBtn icon={Palette} label="Giao diện phòng" onClick={() => setThemeOpen(true)} />
-          <ToolBtn icon={Coffee} label="Tách cafe cho admin ☕" onClick={() => setDonateOpen(true)} accent />
+          <ToolBtn icon={Minimize2} shortLabel="Thu gọn" label="Thu gọn player" onClick={() => setCompact(c => !c)} active={compact} />
+          <ToolBtn icon={Share2}    shortLabel="Chia sẻ"   label="Chia sẻ phòng" onClick={() => setShareOpen(true)} />
+          <ToolBtn icon={CreditCard} shortLabel="Bưu thiếp" label="Bưu thiếp phòng" onClick={() => setPostcardOpen(true)} />
+          <ToolBtn icon={Palette}   shortLabel="Giao diện"  label="Giao diện phòng" onClick={() => setThemeOpen(true)} />
+          <ToolBtn icon={Coffee}    shortLabel="Tách cafe"  label="Ủng hộ admin một tách cafe ☕" onClick={() => setDonateOpen(true)} accent />
+
+          {/* Democracy mode — all see it; only real host can toggle */}
           <ToolBtn
-            icon={UserCheck}
-            label={hostActive ? "Dẫn chủ ON" : "Dẫn chủ OFF"}
-            onClick={() => setHostActive(a => !a)}
-            active={hostActive}
-            disabled={roomState?.hostName !== userName}
+            icon={Users}
+            shortLabel={democracyMode ? "Dân chủ ON" : "Dân chủ OFF"}
+            label={democracyMode ? "Dân chủ: Mọi người có thể điều khiển nhạc" : "Dân chủ: Chỉ host điều khiển"}
+            onClick={handleToggleDemocracy}
+            active={democracyMode}
+            disabled={!isRealHost}
           />
-          <ToolBtn icon={Settings} label="Cài đặt" onClick={() => setSettingsOpen(true)} />
-          <ToolBtn icon={LogOut} label="Rời phòng" onClick={handleLeave} />
+
+          <ToolBtn icon={Settings}  shortLabel="Cài đặt"   label="Cài đặt phòng" onClick={() => setSettingsOpen(true)} />
+          <ToolBtn icon={LogOut}    shortLabel="Rời phòng" label="Rời khỏi phòng" onClick={handleLeave} />
         </div>
       </header>
 
@@ -741,14 +771,14 @@ export default function Room() {
                   currentTrack={roomState?.currentTrack || null}
                   playing={roomState?.playing || false}
                   serverTime={roomState?.currentTime || 0}
-                  isHost={isHost}
+                  isHost={effectiveIsHost}
                   volume={volume}
                   onStateChange={handlePlayerStateChange}
                   onTrackEnd={handleTrackEnd}
                   onTimeUpdate={(ct, dur) => { setPlayerCurrentTime(ct); setPlayerDuration(dur); }}
                 />
                 <PlayerControls
-                  isHost={isHost}
+                  isHost={effectiveIsHost}
                   playing={roomState?.playing || false}
                   currentTime={playerCurrentTime}
                   duration={playerDuration}
@@ -770,7 +800,7 @@ export default function Room() {
                 <WaitingIllustration />
                 {roomState?.currentTrack && (
                   <PlayerControls
-                    isHost={isHost}
+                    isHost={effectiveIsHost}
                     playing={roomState.playing}
                     currentTime={playerCurrentTime}
                     duration={playerDuration}
@@ -799,7 +829,7 @@ export default function Room() {
             playedTracks={roomState?.playedTracks || []}
             currentTrack={roomState?.currentTrack || null}
             chatMessages={roomState?.chatHistory || []}
-            isHost={isHost}
+            isHost={effectiveIsHost}
             currentUser={userName}
             myAvatarUrl={myAvatarUrl || undefined}
             userAvatars={roomState?.userAvatars}

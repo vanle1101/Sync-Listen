@@ -27,4 +27,5 @@ export interface RoomState {
   chatHistory: ChatMessage[];
   repeatMode: RepeatMode;
   shuffle: boolean;
+  democracyMode: boolean;
 }

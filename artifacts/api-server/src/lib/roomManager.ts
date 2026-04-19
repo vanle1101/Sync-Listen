@@ -29,6 +29,7 @@ export interface RoomState {
   chatHistory: ChatMessage[];
   repeatMode: RepeatMode;
   shuffle: boolean;
+  democracyMode: boolean;
 }
 
 interface ListenerInfo {
@@ -54,6 +55,7 @@ export function getOrCreateRoomState(roomId: string, hostName: string): RoomStat
       chatHistory: [],
       repeatMode: 'all',
       shuffle: false,
+      democracyMode: false,
     });
   }
   return rooms.get(roomId)!;

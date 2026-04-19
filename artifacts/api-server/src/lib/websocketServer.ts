@@ -79,6 +79,7 @@ export function setupWebSocketServer(server: http.Server): void {
       }
 
       const isHost = currentUserName === room.hostName;
+      const canControl = isHost || room.democracyMode;
 
       switch (msg.type) {
         case "chat": {
@@ -101,7 +102,7 @@ export function setupWebSocketServer(server: http.Server): void {
         }
 
         case "play_track": {
-          if (!isHost) { sendToSocket(ws, { type: "error", message: "Only host" }); break; }
+          if (!canControl) { sendToSocket(ws, { type: "error", message: "Only host" }); break; }
           const index = typeof msg.index === "number" ? msg.index : 0;
           if (index < 0 || index >= room.playlist.length) break;
           if (room.currentTrack) room.playedTracks.push(room.currentTrack);
@@ -123,7 +124,7 @@ export function setupWebSocketServer(server: http.Server): void {
         }
 
         case "play_pause": {
-          if (!isHost) { sendToSocket(ws, { type: "error", message: "Only host" }); break; }
+          if (!canControl) { sendToSocket(ws, { type: "error", message: "Only host" }); break; }
           if (!room.currentTrack && room.playlist.length > 0) {
             if (room.currentTrack) room.playedTracks.push(room.currentTrack);
             room.currentTrack = pickNextTrack(room)!;
@@ -139,7 +140,7 @@ export function setupWebSocketServer(server: http.Server): void {
         }
 
         case "skip": {
-          if (!isHost) { sendToSocket(ws, { type: "error", message: "Only host" }); break; }
+          if (!canControl) { sendToSocket(ws, { type: "error", message: "Only host" }); break; }
 
           if (room.repeatMode === 'one') {
             // Replay same track
@@ -184,7 +185,7 @@ export function setupWebSocketServer(server: http.Server): void {
         }
 
         case "prev_track": {
-          if (!isHost) { sendToSocket(ws, { type: "error", message: "Only host" }); break; }
+          if (!canControl) { sendToSocket(ws, { type: "error", message: "Only host" }); break; }
           // If currently playing > 3s, restart current
           if ((room.currentTime ?? 0) > 3 && room.currentTrack) {
             room.currentTime = 0;
@@ -206,7 +207,7 @@ export function setupWebSocketServer(server: http.Server): void {
         }
 
         case "set_repeat": {
-          if (!isHost) break;
+          if (!canControl) break;
           const modes = ['none', 'one', 'all'] as const;
           const cur = modes.indexOf(room.repeatMode);
           room.repeatMode = modes[(cur + 1) % 3];
@@ -215,14 +216,14 @@ export function setupWebSocketServer(server: http.Server): void {
         }
 
         case "set_shuffle": {
-          if (!isHost) break;
+          if (!canControl) break;
           room.shuffle = !room.shuffle;
           broadcast(currentRoomId, { type: "settings_update", repeatMode: room.repeatMode, shuffle: room.shuffle });
           break;
         }
 
         case "seek": {
-          if (!isHost) break;
+          if (!canControl) break;
           room.currentTime = (msg.currentTime as number) ?? 0;
           broadcast(currentRoomId, {
             type: "playback",
@@ -231,6 +232,14 @@ export function setupWebSocketServer(server: http.Server): void {
             videoId: room.currentTrack?.videoId ?? null,
             currentTrack: room.currentTrack ?? null,
           }, ws);
+          break;
+        }
+
+        case "set_democracy": {
+          if (!isHost) { sendToSocket(ws, { type: "error", message: "Only host" }); break; }
+          room.democracyMode = !room.democracyMode;
+          broadcast(currentRoomId, { type: "democracy_update", democracyMode: room.democracyMode });
+          logger.info({ roomId: currentRoomId, democracyMode: room.democracyMode }, "Democracy mode toggled");
           break;
         }
 
