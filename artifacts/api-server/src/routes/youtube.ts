@@ -18,6 +18,36 @@ interface YtsResult {
   videos: YtsVideo[];
 }
 
+router.get("/youtube/video/:videoId", async (req, res): Promise<void> => {
+  const { videoId } = req.params;
+  if (!videoId || !/^[a-zA-Z0-9_-]{6,15}$/.test(videoId)) {
+    res.status(400).json({ error: "Invalid video ID" });
+    return;
+  }
+  try {
+    const yts = require("yt-search") as (
+      opts: { videoId: string },
+      cb: (err: Error | null, result: YtsVideo) => void,
+    ) => void;
+    const video = await new Promise<YtsVideo>((resolve, reject) => {
+      yts({ videoId }, (err, r) => {
+        if (err) reject(err);
+        else resolve(r);
+      });
+    });
+    res.json({
+      videoId: video.videoId,
+      title: video.title,
+      channelTitle: video.author?.name ?? "Unknown",
+      thumbnail: video.thumbnail ?? `https://i.ytimg.com/vi/${video.videoId}/mqdefault.jpg`,
+      duration: video.duration?.timestamp ?? null,
+    });
+  } catch (err) {
+    req.log.error({ err }, "yt-search video lookup failed");
+    res.status(500).json({ error: "Video lookup failed" });
+  }
+});
+
 router.get("/youtube/search", async (req, res): Promise<void> => {
   const parsed = YoutubeSearchQueryParams.safeParse(req.query);
   if (!parsed.success) {
