@@ -4,15 +4,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Send, Smile, ImageIcon, X, Plus, Search, Loader2, Check, Trash2, Play, Music, Bell, BellOff } from "lucide-react";
 import { useYoutubeSearch, getYoutubeSearchQueryKey } from "@workspace/api-client-react";
-
-/* ── Emoji picker data ────────────────────────── */
-const EMOJI_CATS = [
-  { icon: "😊", emojis: ["😊","😂","🤣","😍","🥰","🤩","😘","😋","😎","🤗","😄","😁","😉","🥹","😭","😢","😤","😡","🤔","🤭","😴","🥱","😈","🤪","🤐","🫠","🥺","😏","😒","🤯","🫡"] },
-  { icon: "❤️", emojis: ["❤️","🧡","💛","💚","💙","💜","🖤","🤍","💔","💕","💗","💓","💞","💖","💝","💘","♥️","🫶","💌","💟"] },
-  { icon: "👍", emojis: ["👍","👎","👏","🙌","🤝","🙏","👋","🤞","✌️","🤟","🤙","💪","👌","🫶","🫂","🤜","🤛","🫰","🤌","👊"] },
-  { icon: "🎵", emojis: ["🎵","🎶","🎸","🥁","🎹","🎻","🎺","🎷","🎤","🎧","📻","🎼","🎙️","🪗","🪘","🪕","🎚️","🎛️"] },
-  { icon: "🌸", emojis: ["🌸","🌺","🌻","🌹","🍀","🦋","🐱","🐻","🌙","⭐","🌈","🎉","🎀","🎁","🎂","🍕","🧁","✨","💫","🌟","🔥","🌊","🍓","🌿","🫧","🪄","🦄","🍦","🧸"] },
-];
+import Picker from "@emoji-mart/react";
+import data from "@emoji-mart/data";
 
 const IMAGE_URL_RE = /^https?:\/\/\S+\.(jpg|jpeg|png|gif|webp|svg|avif)(\?[^\s]*)?$/i;
 function isImageUrl(t: string) { return IMAGE_URL_RE.test(t.trim()); }
@@ -257,7 +250,6 @@ function PlaylistTab({ playlist, currentTrack, isHost, onAddTrack, onRemoveTrack
 function ChatTab({ messages, currentUser, onSendMessage }: { messages: ChatMessage[]; currentUser: string; onSendMessage: (t: string) => void }) {
   const [text, setText] = useState("");
   const [emojiOpen, setEmojiOpen] = useState(false);
-  const [emojiTab, setEmojiTab] = useState(0);
   const [imageOpen, setImageOpen] = useState(false);
   const [imageUrl, setImageUrl] = useState("");
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -270,7 +262,9 @@ function ChatTab({ messages, currentUser, onSendMessage }: { messages: ChatMessa
 
   useEffect(() => {
     if (!emojiOpen) return;
-    const h = (e: MouseEvent) => { if (emojiRef.current && !emojiRef.current.contains(e.target as Node)) setEmojiOpen(false); };
+    const h = (e: MouseEvent) => {
+      if (emojiRef.current && !emojiRef.current.contains(e.target as Node)) setEmojiOpen(false);
+    };
     document.addEventListener("mousedown", h);
     return () => document.removeEventListener("mousedown", h);
   }, [emojiOpen]);
@@ -282,14 +276,18 @@ function ChatTab({ messages, currentUser, onSendMessage }: { messages: ChatMessa
     setText(""); setEmojiOpen(false);
   };
 
-  const insertEmoji = (emoji: string) => {
+  const insertEmoji = (emoji: any) => {
+    const native: string = emoji.native ?? emoji.unified ?? "";
     const inp = inputRef.current;
     if (inp) {
       const s = inp.selectionStart ?? text.length;
       const end = inp.selectionEnd ?? text.length;
-      setText(text.slice(0, s) + emoji + text.slice(end));
-      setTimeout(() => { inp.focus(); inp.setSelectionRange(s + emoji.length, s + emoji.length); }, 0);
-    } else setText(t => t + emoji);
+      const next = text.slice(0, s) + native + text.slice(end);
+      setText(next);
+      setTimeout(() => { inp.focus(); inp.setSelectionRange(s + native.length, s + native.length); }, 0);
+    } else {
+      setText(t => t + native);
+    }
   };
 
   const handleSendImage = () => {
@@ -346,23 +344,21 @@ function ChatTab({ messages, currentUser, onSendMessage }: { messages: ChatMessa
         </div>
       )}
 
+      {/* emoji-mart Facebook-style picker */}
       {emojiOpen && (
-        <div ref={emojiRef} className="border-t border-primary/5 bg-white/95 shrink-0">
-          <div className="flex gap-0.5 px-2 pt-2 pb-1">
-            {EMOJI_CATS.map((cat, idx) => (
-              <button key={idx} onClick={() => setEmojiTab(idx)}
-                className={`text-base px-2 py-1 rounded-xl transition-all flex-shrink-0 ${emojiTab === idx ? 'bg-primary/10 text-primary' : 'hover:bg-primary/5 text-muted-foreground/60'}`}>
-                {cat.icon}
-              </button>
-            ))}
-          </div>
-          <div className="grid gap-0.5 px-2 pb-2 overflow-y-auto" style={{ gridTemplateColumns: "repeat(8, 1fr)", maxHeight: 140 }}>
-            {EMOJI_CATS[emojiTab].emojis.map(emoji => (
-              <button key={emoji} onClick={() => insertEmoji(emoji)} className="text-lg p-1 rounded-xl hover:bg-primary/10 transition-colors text-center leading-none">
-                {emoji}
-              </button>
-            ))}
-          </div>
+        <div ref={emojiRef} className="border-t border-primary/5 shrink-0 emoji-picker-wrapper">
+          <Picker
+            data={data}
+            set="facebook"
+            theme="light"
+            locale="vi"
+            previewPosition="none"
+            skinTonePosition="none"
+            navPosition="bottom"
+            perLine={8}
+            onEmojiSelect={insertEmoji}
+            style={{ width: "100%", border: "none", borderRadius: 0, boxShadow: "none" }}
+          />
         </div>
       )}
 

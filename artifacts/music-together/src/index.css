@@ -150,3 +150,23 @@ a, button, [role="button"], input, select, textarea, label,
 ::-webkit-scrollbar-thumb:hover {
   background: hsl(345 32% 55% / 0.32);
 }
+
+/* ── Emoji-mart custom theme ──────────────────── */
+.emoji-picker-wrapper em-emoji-picker {
+  --border-radius: 0;
+  --border-color: transparent;
+  --background-rgb: 255, 252, 250;
+  --category-icon-size: 18px;
+  --font-family: 'Nunito', sans-serif;
+  --font-size: 13px;
+  --color-border: transparent;
+  --color-border-over: rgba(192, 112, 128, 0.15);
+  --rgb-accent: 192, 112, 128;
+  --rgb-background: 255, 252, 250;
+  --rgb-input: 250, 245, 241;
+  --rgb-color: 60, 30, 20;
+  width: 100% !important;
+  max-height: 300px;
+  box-shadow: none !important;
+  border: none !important;
+}
