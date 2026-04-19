@@ -9,7 +9,7 @@ import { PlayerControls } from "@/components/player-controls";
 import { RightPanel } from "@/components/right-panel";
 import {
   Music, Loader2, Copy, LogOut, Minimize2, Share2, CreditCard,
-  Palette, Coffee, UserCheck, Settings, Globe, Users, X, Download, Check, Heart
+  Palette, Coffee, UserCheck, Settings, Globe, Users, X, Download, Check, Heart, ImagePlus
 } from "lucide-react";
 import { useGetRoom, getGetRoomQueryKey } from "@workspace/api-client-react";
 
@@ -29,12 +29,14 @@ function nowTime() { return new Date().toLocaleTimeString([], { hour: '2-digit',
 
 /* ──────────────── Themes ──────────────── */
 const THEMES = [
-  { id: "cream",    name: "Kem hoa",    colors: ["#fdf6f0","#c07080","#7a9e7e"], bg: "from-[#fdf6f0] via-[#fce8e8] to-[#eef5ef]" },
-  { id: "midnight", name: "Đêm xanh",   colors: ["#1e1b2e","#8b7dff","#5eead4"], bg: "from-[#1e1b2e] via-[#2d1b3d] to-[#1a2e2a]" },
-  { id: "garden",   name: "Vườn xanh",  colors: ["#eef4ee","#4a7c59","#8b7355"], bg: "from-[#eef4ee] via-[#ddeedd] to-[#f5f0e8]" },
-  { id: "rose",     name: "Hồng phấn",  colors: ["#fdf0f3","#d4687a","#d4a064"], bg: "from-[#fdf0f3] via-[#fce0e8] to-[#fdf5e8]" },
-  { id: "lavender", name: "Oải hương",  colors: ["#f4f0fc","#8b6cce","#c07080"], bg: "from-[#f4f0fc] via-[#ece0f8] to-[#fce8f0]" },
-  { id: "ocean",    name: "Đại dương",  colors: ["#eef4f8","#2d7dd2","#2da88e"], bg: "from-[#eef4f8] via-[#ddeef8] to-[#e0f5f0]" },
+  { id: "cream",    emoji: "☕", name: "Cream",    colors: ["#fdf6f0","#c07080","#7a9e7e"], bg: "from-[#fdf6f0] via-[#fce8e8] to-[#eef5ef]" },
+  { id: "midnight", emoji: "🌙", name: "Midnight",  colors: ["#1e1b2e","#8b7dff","#5eead4"], bg: "from-[#1e1b2e] via-[#2d1b3d] to-[#1a2e2a]" },
+  { id: "sakura",   emoji: "🌸", name: "Sakura",    colors: ["#fff0f5","#e87090","#f8b8c8"], bg: "from-[#fff0f5] via-[#fce0ec] to-[#fef0f8]" },
+  { id: "ocean",    emoji: "🌊", name: "Ocean",     colors: ["#eef4f8","#2d7dd2","#2da88e"], bg: "from-[#eef4f8] via-[#ddeef8] to-[#e0f5f0]" },
+  { id: "forest",   emoji: "🌿", name: "Forest",    colors: ["#eef4ee","#4a7c59","#8b7355"], bg: "from-[#eef4ee] via-[#ddeedd] to-[#f5f0e8]" },
+  { id: "sunset",   emoji: "🌅", name: "Sunset",    colors: ["#fff4e0","#e86030","#f0a020"], bg: "from-[#fff4e0] via-[#ffe0c0] to-[#fff0e8]" },
+  { id: "neon",     emoji: "💜", name: "Neon",      colors: ["#1a0a2e","#b060ff","#ff60d0"], bg: "from-[#1a0a2e] via-[#2a0a40] to-[#1a1a3e]" },
+  { id: "arctic",   emoji: "❄️", name: "Arctic",    colors: ["#eef8fc","#40b0e0","#80d0f0"], bg: "from-[#eef8fc] via-[#ddeef8] to-[#e8f4fc]" },
 ];
 
 /* ──────────────── WaitingIllustration ──────────────── */
@@ -240,22 +242,69 @@ function PostcardModal({
 }
 
 /* ──────────────── Theme Modal ──────────────── */
-function ThemeModal({ currentTheme, onSelect, onClose }: { currentTheme: string; onSelect: (id: string) => void; onClose: () => void }) {
+function ThemeModal({
+  currentTheme, onSelect, bgImageUrl, onSetBgImage, onClose,
+}: {
+  currentTheme: string; onSelect: (id: string) => void;
+  bgImageUrl: string; onSetBgImage: (url: string) => void; onClose: () => void;
+}) {
+  const fileRef = useRef<HTMLInputElement>(null);
+
+  const handleFile = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = ev => {
+      const url = ev.target?.result as string;
+      onSetBgImage(url);
+    };
+    reader.readAsDataURL(file);
+  };
+
   return (
     <ModalBase title="Giao diện phòng" onClose={onClose}>
-      <p className="text-sm text-muted-foreground mb-4">Chọn màu nền yêu thích của bạn</p>
-      <div className="grid grid-cols-3 gap-3">
-        {THEMES.map(t => (
-          <button key={t.id} onClick={() => { onSelect(t.id); onClose(); }}
-            className={`flex flex-col items-center gap-2 p-3 rounded-2xl border-2 transition-all hover:scale-105 ${currentTheme === t.id ? 'border-primary shadow-md' : 'border-primary/10 hover:border-primary/30'}`}>
-            <div className="flex gap-1">
-              {t.colors.map((c, i) => <div key={i} className="w-5 h-5 rounded-full border border-white/50 shadow-sm" style={{ background: c }} />)}
-            </div>
-            <span className="text-xs font-medium text-foreground/70">{t.name}</span>
-            {currentTheme === t.id && <Check className="w-3 h-3 text-primary" />}
-          </button>
-        ))}
+      {/* Theme grid 4-col */}
+      <div className="grid grid-cols-4 gap-2.5">
+        {THEMES.map(t => {
+          const active = currentTheme === t.id && !bgImageUrl;
+          return (
+            <button key={t.id}
+              onClick={() => { onSelect(t.id); onSetBgImage(""); }}
+              className={`flex flex-col items-center gap-1.5 py-3 px-1 rounded-2xl border-2 transition-all hover:scale-105 active:scale-95
+                ${active ? 'border-primary shadow-md bg-primary/5' : 'border-border/60 hover:border-primary/40 bg-white/60'}`}>
+              <span className="text-2xl leading-none">{t.emoji}</span>
+              <span className="text-[11px] font-medium text-foreground/70">{t.name}</span>
+            </button>
+          );
+        })}
       </div>
+
+      {/* Divider */}
+      <div className="my-4 border-t border-border/40" />
+
+      {/* Background image upload */}
+      <p className="text-[10px] font-bold tracking-widest text-muted-foreground/60 mb-3">ẢNH NỀN</p>
+      <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={handleFile} />
+
+      {bgImageUrl ? (
+        <div className="relative rounded-2xl overflow-hidden border-2 border-primary shadow-md">
+          <img src={bgImageUrl} alt="bg" className="w-full h-24 object-cover" />
+          <button onClick={() => onSetBgImage("")}
+            className="absolute top-2 right-2 w-7 h-7 rounded-full bg-black/50 flex items-center justify-center text-white hover:bg-black/70 transition-colors">
+            <X className="w-3.5 h-3.5" />
+          </button>
+          <button onClick={() => fileRef.current?.click()}
+            className="absolute bottom-2 right-2 px-2 py-1 rounded-lg bg-black/50 text-white text-[10px] hover:bg-black/70 transition-colors">
+            Đổi ảnh
+          </button>
+        </div>
+      ) : (
+        <button onClick={() => fileRef.current?.click()}
+          className="w-full flex flex-col items-center gap-2 py-5 rounded-2xl border-2 border-dashed border-border/60 hover:border-primary/50 hover:bg-primary/3 transition-all text-muted-foreground/60 hover:text-primary/70">
+          <ImagePlus className="w-6 h-6" />
+          <span className="text-sm">Tải ảnh lên</span>
+        </button>
+      )}
     </ModalBase>
   );
 }
@@ -401,6 +450,16 @@ export default function Room() {
   const [compact, setCompact] = useState(false);
   const [hostActive, setHostActive] = useState(true);
   const [themeId, setThemeId] = useState("cream");
+  const [bgImageUrl, setBgImageUrl] = useState<string>(() => {
+    try { return localStorage.getItem("music-together-bg") ?? ""; } catch { return ""; }
+  });
+  const handleSetBgImage = (url: string) => {
+    setBgImageUrl(url);
+    try {
+      if (url) localStorage.setItem("music-together-bg", url);
+      else localStorage.removeItem("music-together-bg");
+    } catch { /* quota exceeded */ }
+  };
 
   // Modal state
   const [shareOpen, setShareOpen] = useState(false);
@@ -486,7 +545,10 @@ export default function Room() {
   const showPlayer = !!roomState?.currentTrack;
 
   return (
-    <div className={`h-screen overflow-hidden w-full flex flex-col font-sans bg-gradient-to-br ${currentTheme.bg} relative`}>
+    <div
+      className={`h-screen overflow-hidden w-full flex flex-col font-sans relative ${bgImageUrl ? '' : `bg-gradient-to-br ${currentTheme.bg}`}`}
+      style={bgImageUrl ? { backgroundImage: `url(${bgImageUrl})`, backgroundSize: 'cover', backgroundPosition: 'center' } : undefined}
+    >
       {/* Petal BG dots */}
       <div className="absolute inset-0 pointer-events-none opacity-30" style={{
         backgroundImage: `radial-gradient(circle at 20% 50%, ${currentTheme.colors[1]}22 0%, transparent 50%),
@@ -642,7 +704,7 @@ export default function Room() {
       {/* ── Modals ──────────────────────────── */}
       {shareOpen    && <ShareModal    roomId={roomId} onClose={() => setShareOpen(false)} />}
       {postcardOpen && <PostcardModal roomId={roomId} hostName={roomState?.hostName ?? ""} currentTrack={roomState?.currentTrack ?? null} listeners={roomState?.listeners ?? []} onClose={() => setPostcardOpen(false)} />}
-      {themeOpen    && <ThemeModal    currentTheme={themeId} onSelect={setThemeId} onClose={() => setThemeOpen(false)} />}
+      {themeOpen    && <ThemeModal    currentTheme={themeId} onSelect={setThemeId} bgImageUrl={bgImageUrl} onSetBgImage={handleSetBgImage} onClose={() => setThemeOpen(false)} />}
       {settingsOpen && <SettingsModal roomId={roomId} hostName={roomState?.hostName ?? ""} listeners={roomState?.listeners ?? []} onClose={() => setSettingsOpen(false)} />}
       {donateOpen   && <DonateModal   onClose={() => setDonateOpen(false)} />}
     </div>
