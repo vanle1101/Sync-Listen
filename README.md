@@ -50,6 +50,8 @@ pnpm install --frozen-lockfile
 - `BASE_PATH` (bat buoc, thuong la `/`)
 - `VITE_CLERK_PUBLISHABLE_KEY` (bat buoc)
 - `VITE_CLERK_PROXY_URL` (tuy chon)
+- `VITE_API_BASE_URL` (tuy chon, vi du `https://api.example.com`)
+- `VITE_WS_URL` (tuy chon, vi du `wss://api.example.com/ws`)
 
 Frontend da co file: `artifacts/music-together/.env` (chua `VITE_CLERK_PUBLISHABLE_KEY`).
 
@@ -112,7 +114,6 @@ pnpm --filter @workspace/db run push
 
 ## 8. Luu y quan trong
 
-- App web goi WebSocket qua `window.location.host` tai path `/ws`.
-- App web goi REST qua path tuong doi `/api/...`.
-- Vi vay khi chay ngoai Replit, ban can reverse-proxy de frontend va backend cung origin (it nhat route duoc `/api` va `/ws` ve backend).
-
+- Mac dinh app goi REST qua `/api/...` va WebSocket qua `/ws` tren cung origin.
+- Neu deploy tach frontend/backend, dat `VITE_API_BASE_URL` va/hoac `VITE_WS_URL`.
+- Neu khong dat 2 bien tren, ban can reverse-proxy de frontend va backend cung origin (it nhat route duoc `/api` va `/ws` ve backend).

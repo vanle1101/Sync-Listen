@@ -9,22 +9,21 @@ import {
   sendToSocket,
   deleteRoom,
   pickNextTrack,
+  getEffectiveCurrentTime,
+  updatePlaybackAnchor,
+  buildPlaybackPayload,
+  buildRoomStateForClient,
   type Track,
 } from "./roomManager";
 import { logger } from "./logger";
 import { recordSession } from "./streakService";
 import { db, roomsTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
+import { normalizeRoomId } from "./roomId";
 
-function broadcastPlayback(roomId: string, room: ReturnType<typeof getRoomState>) {
+function broadcastPlayback(roomId: string, room: ReturnType<typeof getRoomState>, exclude?: WebSocket) {
   if (!room) return;
-  broadcast(roomId, {
-    type: "playback",
-    playing: room.playing,
-    currentTime: room.currentTime,
-    videoId: room.currentTrack?.videoId ?? null,
-    currentTrack: room.currentTrack ?? null,
-  });
+  broadcast(roomId, buildPlaybackPayload(room), exclude);
 }
 
 function broadcastFullState(roomId: string, room: ReturnType<typeof getRoomState>) {
@@ -50,7 +49,7 @@ export function setupWebSocketServer(server: http.Server): void {
       }
 
       if (msg.type === "join") {
-        const roomId = msg.roomId as string;
+        const roomId = normalizeRoomId(msg.roomId as string);
         const userName = msg.userName as string;
         if (!roomId || !userName) {
           sendToSocket(ws, { type: "error", message: "Missing roomId or userName" });
@@ -74,8 +73,10 @@ export function setupWebSocketServer(server: http.Server): void {
             room.userAvatars[userName] = avatarUrl.substring(0, 512);
           }
           addListener(roomId, ws, userName);
-          sendToSocket(ws, { type: "room_state", room });
-          broadcast(roomId, { type: "listeners_update", listeners: room.listeners, hostName: room.hostName, userAvatars: room.userAvatars }, ws);
+          sendToSocket(ws, { type: "room_state", room: buildRoomStateForClient(room) });
+          // Broadcast listeners update to everyone (including the newly joined client)
+          // so UI can hydrate listeners state without requiring a page refresh.
+          broadcast(roomId, { type: "listeners_update", listeners: room.listeners, hostName: room.hostName, userAvatars: room.userAvatars });
           logger.info({ roomId, userName }, "User joined room");
           if (room.listeners.length >= 2) {
             recordSession(roomId).catch(() => {});
@@ -138,6 +139,61 @@ export function setupWebSocketServer(server: http.Server): void {
           break;
         }
 
+        case "move_track": {
+          if (!canControl) { sendToSocket(ws, { type: "error", message: "Only host" }); break; }
+          const fromIndex = Number(msg.fromIndex);
+          const toIndex = Number(msg.toIndex);
+          if (
+            !Number.isInteger(fromIndex) ||
+            !Number.isInteger(toIndex) ||
+            fromIndex < 0 ||
+            toIndex < 0 ||
+            fromIndex >= room.playlist.length ||
+            toIndex >= room.playlist.length ||
+            fromIndex === toIndex
+          ) break;
+          const [moved] = room.playlist.splice(fromIndex, 1);
+          room.playlist.splice(toIndex, 0, moved);
+          broadcast(currentRoomId, { type: "playlist_update", playlist: room.playlist, playedTracks: room.playedTracks });
+          break;
+        }
+
+        case "move_played_track": {
+          if (!canControl) { sendToSocket(ws, { type: "error", message: "Only host" }); break; }
+          const fromIndex = Number(msg.fromIndex);
+          const toIndex = Number(msg.toIndex);
+          if (
+            !Number.isInteger(fromIndex) ||
+            !Number.isInteger(toIndex) ||
+            fromIndex < 0 ||
+            toIndex < 0 ||
+            fromIndex >= room.playedTracks.length ||
+            toIndex >= room.playedTracks.length ||
+            fromIndex === toIndex
+          ) break;
+          const [moved] = room.playedTracks.splice(fromIndex, 1);
+          room.playedTracks.splice(toIndex, 0, moved);
+          broadcast(currentRoomId, { type: "playlist_update", playlist: room.playlist, playedTracks: room.playedTracks });
+          break;
+        }
+
+        case "move_played_to_playlist": {
+          if (!canControl) { sendToSocket(ws, { type: "error", message: "Only host" }); break; }
+          const fromPlayedIndex = Number(msg.fromPlayedIndex);
+          const requestedQueueIndex = Number(msg.toQueueIndex);
+          if (
+            !Number.isInteger(fromPlayedIndex) ||
+            fromPlayedIndex < 0 ||
+            fromPlayedIndex >= room.playedTracks.length ||
+            !Number.isInteger(requestedQueueIndex)
+          ) break;
+          const toQueueIndex = Math.max(0, Math.min(requestedQueueIndex, room.playlist.length));
+          const [moved] = room.playedTracks.splice(fromPlayedIndex, 1);
+          room.playlist.splice(toQueueIndex, 0, moved);
+          broadcast(currentRoomId, { type: "playlist_update", playlist: room.playlist, playedTracks: room.playedTracks });
+          break;
+        }
+
         case "play_track": {
           if (!canControl) { sendToSocket(ws, { type: "error", message: "Only host" }); break; }
           const index = typeof msg.index === "number" ? msg.index : 0;
@@ -145,8 +201,7 @@ export function setupWebSocketServer(server: http.Server): void {
           if (room.currentTrack) room.playedTracks.push(room.currentTrack);
           room.currentTrack = room.playlist[index];
           room.playlist.splice(index, 1);
-          room.playing = true;
-          room.currentTime = 0;
+          updatePlaybackAnchor(room, { playing: true, currentTime: 0 });
           logger.info({ roomId: currentRoomId, trackId: room.currentTrack.videoId }, "Host started track");
           broadcastFullState(currentRoomId, room);
           break;
@@ -167,12 +222,10 @@ export function setupWebSocketServer(server: http.Server): void {
           // Discard current track, move to next without adding to history
           if (room.playlist.length > 0) {
             room.currentTrack = pickNextTrack(room)!;
-            room.playing = true;
-            room.currentTime = 0;
+            updatePlaybackAnchor(room, { playing: true, currentTime: 0 });
           } else {
             room.currentTrack = null;
-            room.playing = false;
-            room.currentTime = 0;
+            updatePlaybackAnchor(room, { playing: false, currentTime: 0 });
           }
           broadcastFullState(currentRoomId, room);
           break;
@@ -195,8 +248,7 @@ export function setupWebSocketServer(server: http.Server): void {
           // Push current to front of queue, set replayed track as current
           if (room.currentTrack) room.playlist.unshift(room.currentTrack);
           room.currentTrack = replayTrack;
-          room.playing = true;
-          room.currentTime = 0;
+          updatePlaybackAnchor(room, { playing: true, currentTime: 0 });
           broadcastFullState(currentRoomId, room);
           break;
         }
@@ -206,12 +258,14 @@ export function setupWebSocketServer(server: http.Server): void {
           if (!room.currentTrack && room.playlist.length > 0) {
             if (room.currentTrack) room.playedTracks.push(room.currentTrack);
             room.currentTrack = pickNextTrack(room)!;
-            room.playing = true;
-            room.currentTime = 0;
+            updatePlaybackAnchor(room, { playing: true, currentTime: 0 });
             broadcast(currentRoomId, { type: "playlist_update", playlist: room.playlist, playedTracks: room.playedTracks });
           } else {
-            room.playing = msg.playing as boolean;
-            room.currentTime = (msg.currentTime as number) ?? room.currentTime;
+            const requestedTime = Number(msg.currentTime);
+            updatePlaybackAnchor(room, {
+              playing: typeof msg.playing === "boolean" ? msg.playing : undefined,
+              currentTime: Number.isFinite(requestedTime) ? requestedTime : undefined,
+            });
           }
           broadcastPlayback(currentRoomId, room);
           break;
@@ -222,8 +276,7 @@ export function setupWebSocketServer(server: http.Server): void {
 
           if (room.repeatMode === 'one') {
             // Replay same track
-            room.currentTime = 0;
-            room.playing = true;
+            updatePlaybackAnchor(room, { playing: true, currentTime: 0 });
             broadcastPlayback(currentRoomId, room);
             break;
           }
@@ -252,11 +305,9 @@ export function setupWebSocketServer(server: http.Server): void {
             room.currentTrack = room.playlist.shift()!;
           } else {
             room.currentTrack = null;
-            room.playing = false;
           }
 
-          room.currentTime = 0;
-          if (room.currentTrack) room.playing = true;
+          updatePlaybackAnchor(room, { playing: room.currentTrack !== null, currentTime: 0 });
           logger.info({ roomId: currentRoomId, next: room.currentTrack?.videoId ?? 'none' }, "Skipped to next track");
           broadcastFullState(currentRoomId, room);
           break;
@@ -265,9 +316,8 @@ export function setupWebSocketServer(server: http.Server): void {
         case "prev_track": {
           if (!canControl) { sendToSocket(ws, { type: "error", message: "Only host" }); break; }
           // If currently playing > 3s, restart current
-          if ((room.currentTime ?? 0) > 3 && room.currentTrack) {
-            room.currentTime = 0;
-            room.playing = true;
+          if (getEffectiveCurrentTime(room) > 3 && room.currentTrack) {
+            updatePlaybackAnchor(room, { playing: true, currentTime: 0 });
             broadcastPlayback(currentRoomId, room);
             break;
           }
@@ -278,8 +328,7 @@ export function setupWebSocketServer(server: http.Server): void {
           } else {
             room.currentTrack = room.playlist.length > 0 ? room.playlist.shift()! : null;
           }
-          room.currentTime = 0;
-          room.playing = room.currentTrack !== null;
+          updatePlaybackAnchor(room, { playing: room.currentTrack !== null, currentTime: 0 });
           broadcastFullState(currentRoomId, room);
           break;
         }
@@ -300,16 +349,25 @@ export function setupWebSocketServer(server: http.Server): void {
           break;
         }
 
+        case "sync_time": {
+          if (!canControl) break;
+          const nextTime = Number(msg.currentTime);
+          if (!Number.isFinite(nextTime) || nextTime < 0) break;
+          updatePlaybackAnchor(room, {
+            currentTime: nextTime,
+            playing: typeof msg.playing === "boolean" ? msg.playing : undefined,
+          });
+          // Host heartbeat: forward to listeners so newly joined devices stay aligned.
+          broadcastPlayback(currentRoomId, room, ws);
+          break;
+        }
+
         case "seek": {
           if (!canControl) break;
-          room.currentTime = (msg.currentTime as number) ?? 0;
-          broadcast(currentRoomId, {
-            type: "playback",
-            playing: room.playing,
-            currentTime: room.currentTime,
-            videoId: room.currentTrack?.videoId ?? null,
-            currentTrack: room.currentTrack ?? null,
-          });
+          const nextTime = Number(msg.currentTime);
+          if (!Number.isFinite(nextTime) || nextTime < 0) break;
+          updatePlaybackAnchor(room, { currentTime: nextTime });
+          broadcastPlayback(currentRoomId, room);
           break;
         }
 

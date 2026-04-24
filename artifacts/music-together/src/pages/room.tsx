@@ -8,6 +8,8 @@ import { Button } from "@/components/ui/button";
 import { YoutubePlayer } from "@/components/youtube-player";
 import { PlayerControls } from "@/components/player-controls";
 import { RightPanel } from "@/components/right-panel";
+import { getApiUrl } from "@/lib/runtime-config";
+import { normalizeRoomId } from "@/lib/room-id";
 import {
   Music, Loader2, Copy, LogOut, Minimize2, Maximize2, Share2, CreditCard,
   Palette, Coffee, Settings, Globe, Users, X, Download, Check, Heart, ImagePlus, Power, Lock, Eye, EyeOff,
@@ -21,13 +23,25 @@ function saveRecentRoom(roomId: string, hostName: string, roomName?: string) {
     const key = "music-together-rooms";
     const raw = localStorage.getItem(key);
     const rooms: { id: string; hostName: string; roomName?: string; visitedAt: number }[] = raw ? JSON.parse(raw) : [];
-    const filtered = rooms.filter(r => r.id !== roomId);
-    filtered.unshift({ id: roomId, hostName, roomName, visitedAt: Date.now() });
+    const normalizedRoomId = normalizeRoomId(roomId);
+    const filtered = rooms.filter(r => normalizeRoomId(r.id) !== normalizedRoomId);
+    filtered.unshift({ id: normalizedRoomId, hostName, roomName, visitedAt: Date.now() });
     localStorage.setItem(key, JSON.stringify(filtered.slice(0, 8)));
   } catch {}
 }
 
 function nowTime() { return new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }); }
+
+function detectMobileBackgroundHint() {
+  if (typeof navigator === "undefined") return { isMobile: false, isCocCoc: false };
+  const ua = navigator.userAgent || "";
+  return {
+    isMobile: /Android|iPhone|iPad|iPod/i.test(ua),
+    isCocCoc: /coc_coc_browser|coccocbrowser|cocbrowser/i.test(ua),
+  };
+}
+
+const RECENT_JOIN_GESTURE_KEY = "music-together-recent-join-gesture-at";
 
 /* ──────────────── Themes ──────────────── */
 const THEMES = [
@@ -646,7 +660,7 @@ function DonateModal({ onClose }: { onClose: () => void }) {
 /* ──────────────── Main Room Page ──────────────── */
 export default function Room() {
   const params = useParams();
-  const roomId = params.roomId as string;
+  const roomId = normalizeRoomId(params.roomId as string);
   const [, setLocation] = useLocation();
   const { toast } = useToast();
   const { user, isLoaded: clerkLoaded } = useUser();
@@ -666,7 +680,10 @@ export default function Room() {
   const [fsChatMinimized, setFsChatMinimized] = useState(false);
   const [fsUnread, setFsUnread] = useState(0);
   const prevChatLenRef = useRef(0);
+  const autoplayJoinAttemptRef = useRef<string | null>(null);
   const [hostActive, setHostActive] = useState(true);
+  const [listenersOpen, setListenersOpen] = useState(false);
+  const listenersPopoverRef = useRef<HTMLDivElement>(null);
   const [themeId, setThemeId] = useState("cream");
   const [bgImageUrl, setBgImageUrl] = useState<string>(() => {
     try { return localStorage.getItem("music-together-bg") ?? ""; } catch { return ""; }
@@ -685,6 +702,7 @@ export default function Room() {
   const [themeOpen, setThemeOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [donateOpen, setDonateOpen] = useState(false);
+  const [showBackgroundHint, setShowBackgroundHint] = useState(false);
 
   // Activity log
   const [activities, setActivities] = useState<{ text: string; time: string }[]>([]);
@@ -715,11 +733,18 @@ export default function Room() {
     }
   }, [clerkLoaded, user, setLocation]);
 
+  useEffect(() => {
+    const rawRoomId = params.roomId as string | undefined;
+    if (!rawRoomId || rawRoomId === roomId) return;
+    setLocation(`/room/${roomId}`, { replace: true });
+  }, [params.roomId, roomId, setLocation]);
+
   const { data: _roomInfo, isLoading: isLoadingRoom, error: roomError } = useGetRoom(roomId, {
     query: { enabled: !!roomId, queryKey: getGetRoomQueryKey(roomId) }
   });
 
   const { roomState, connected, sendAction, roomClosed } = useWebSocket(roomId, userName, myAvatarUrl || null);
+  const roomErrorNotifiedRef = useRef(false);
 
   const prevListenersRef = useRef<string[]>([]);
   useEffect(() => {
@@ -735,7 +760,7 @@ export default function Room() {
   const listenerCount = roomState?.listeners.length ?? 0;
   useEffect(() => {
     if (!roomId) return;
-    fetch(`/api/rooms/${roomId}/streak`)
+    fetch(getApiUrl(`/api/rooms/${roomId}/streak`))
       .then(r => r.ok ? r.json() : null)
       .then(d => { if (d && typeof d.streak === 'number') setStreakData({ streak: d.streak, freezesAvailable: d.freezesAvailable ?? 0, freezesUsed: d.freezesUsed ?? 0 }); })
       .catch(() => {});
@@ -746,8 +771,30 @@ export default function Room() {
   }, [roomId, roomState?.hostName, roomState?.roomName]);
 
   useEffect(() => {
-    if (roomError) { toast({ title: "Phòng không tìm thấy", variant: "destructive" }); setLocation("/"); }
+    const { isMobile, isCocCoc } = detectMobileBackgroundHint();
+    if (!isMobile || isCocCoc) return;
+    try {
+      if (localStorage.getItem("music-together-hide-bg-hint") === "1") return;
+    } catch {}
+    setShowBackgroundHint(true);
+  }, []);
+
+  useEffect(() => {
+    if (!roomError || roomErrorNotifiedRef.current) return;
+    roomErrorNotifiedRef.current = true;
+    toast({ title: "Phòng không tìm thấy", variant: "destructive" });
+    setLocation("/");
   }, [roomError, setLocation, toast]);
+
+  useEffect(() => {
+    const onDocClick = (ev: MouseEvent) => {
+      if (!listenersPopoverRef.current) return;
+      const target = ev.target as Node | null;
+      if (target && !listenersPopoverRef.current.contains(target)) setListenersOpen(false);
+    };
+    document.addEventListener("mousedown", onDocClick);
+    return () => document.removeEventListener("mousedown", onDocClick);
+  }, []);
 
   useEffect(() => {
     if (!roomClosed) return;
@@ -767,7 +814,60 @@ export default function Room() {
   const isHost = hostActive && isRealHost;
   const democracyMode = roomState?.democracyMode ?? false;
   const effectiveIsHost = isHost || democracyMode;
+  const playbackAuthority = isHost;
   const currentTheme = THEMES.find(t => t.id === themeId) ?? THEMES[0];
+
+  const emitPlaybackGesture = useCallback((play: boolean, track: Track | null, currentTime?: number) => {
+    if (typeof window === "undefined") return;
+    window.dispatchEvent(new CustomEvent("mt-playback-gesture", { detail: { play, track, currentTime } }));
+  }, []);
+
+  useEffect(() => {
+    const primeOnFirstInteraction = () => {
+      emitPlaybackGesture(roomState?.playing ?? false, roomState?.currentTrack ?? null, roomState?.currentTime ?? 0);
+      document.removeEventListener("touchstart", primeOnFirstInteraction);
+      document.removeEventListener("click", primeOnFirstInteraction);
+      document.removeEventListener("keydown", primeOnFirstInteraction);
+    };
+    document.addEventListener("touchstart", primeOnFirstInteraction, { passive: true });
+    document.addEventListener("click", primeOnFirstInteraction);
+    document.addEventListener("keydown", primeOnFirstInteraction);
+    return () => {
+      document.removeEventListener("touchstart", primeOnFirstInteraction);
+      document.removeEventListener("click", primeOnFirstInteraction);
+      document.removeEventListener("keydown", primeOnFirstInteraction);
+    };
+  }, [emitPlaybackGesture, roomState?.playing, roomState?.currentTrack?.videoId]);
+
+  useEffect(() => {
+    if (!roomState?.currentTrack || !roomState.playing) return;
+    emitPlaybackGesture(true, roomState.currentTrack, roomState.currentTime ?? 0);
+  }, [emitPlaybackGesture, roomState?.currentTrack?.videoId, roomState?.playing]);
+
+  useEffect(() => {
+    if (!roomState?.currentTrack || !roomState.playing) return;
+    const attemptKey = `${roomState.currentTrack.source ?? "youtube"}:${roomState.currentTrack.videoId}`;
+    if (autoplayJoinAttemptRef.current === attemptKey) return;
+
+    let recentGestureAt = 0;
+    try { recentGestureAt = Number(sessionStorage.getItem(RECENT_JOIN_GESTURE_KEY) ?? "0"); } catch {}
+    if (!Number.isFinite(recentGestureAt) || Date.now() - recentGestureAt > 12000) return;
+
+    autoplayJoinAttemptRef.current = attemptKey;
+    emitPlaybackGesture(true, roomState.currentTrack, roomState.currentTime ?? 0);
+    const retryA = setTimeout(() => {
+      emitPlaybackGesture(true, roomState.currentTrack ?? null, roomState.currentTime ?? 0);
+    }, 180);
+    const retryB = setTimeout(() => {
+      emitPlaybackGesture(true, roomState.currentTrack ?? null, roomState.currentTime ?? 0);
+      try { sessionStorage.removeItem(RECENT_JOIN_GESTURE_KEY); } catch {}
+    }, 520);
+
+    return () => {
+      clearTimeout(retryA);
+      clearTimeout(retryB);
+    };
+  }, [emitPlaybackGesture, roomState?.currentTrack?.videoId, roomState?.currentTrack?.source, roomState?.playing]);
 
   /* handlers */
   const handleAddTrack = (track: Track) => {
@@ -775,25 +875,55 @@ export default function Room() {
     addActivity(`${userName} đã thêm "${track.title}"`);
   };
   const handleRemoveTrack = (i: number) => sendAction({ type: "remove_track", index: i });
-  const handlePlayTrack = (i: number) => sendAction({ type: "play_track", index: i });
+  const handleMoveTrack = (fromIndex: number, toIndex: number) => sendAction({ type: "move_track", fromIndex, toIndex });
+  const handlePlayTrack = (i: number) => {
+    emitPlaybackGesture(true, roomState?.playlist?.[i] ?? null, 0);
+    sendAction({ type: "play_track", index: i });
+  };
   const handleRemoveCurrent = () => sendAction({ type: "remove_current" });
   const handleRemovePlayed = (i: number) => sendAction({ type: "remove_played", index: i });
-  const handleReplayPlayed = (i: number) => sendAction({ type: "replay_played", index: i });
-  const handleSeek = (time: number) => sendAction({ type: "seek", currentTime: time });
+  const handleMovePlayed = (fromIndex: number, toIndex: number) => sendAction({ type: "move_played_track", fromIndex, toIndex });
+  const handleMovePlayedToQueue = (fromPlayedIndex: number, toQueueIndex: number) =>
+    sendAction({ type: "move_played_to_playlist", fromPlayedIndex, toQueueIndex });
+  const handleReplayPlayed = (i: number) => {
+    emitPlaybackGesture(true, roomState?.playedTracks?.[i] ?? null, 0);
+    sendAction({ type: "replay_played", index: i });
+  };
+  const handleSeek = (time: number) => {
+    emitPlaybackGesture(roomState?.playing ?? false, roomState?.currentTrack ?? null, time);
+    sendAction({ type: "seek", currentTime: time });
+  };
   const handlePlayPause = () => {
     if (!roomState) return;
-    sendAction({ type: "play_pause", playing: !roomState.playing, currentTime: playerCurrentTime });
+    const nextPlaying = !roomState.playing;
+    const targetTrack = roomState.currentTrack ?? roomState.playlist?.[0] ?? null;
+    const syncedCurrentTime = Number.isFinite(playerCurrentTime) && playerCurrentTime > 0.25
+      ? playerCurrentTime
+      : (roomState.currentTime ?? 0);
+    emitPlaybackGesture(nextPlaying, targetTrack, syncedCurrentTime);
+    if (nextPlaying) {
+      setTimeout(() => emitPlaybackGesture(true, targetTrack, syncedCurrentTime), 140);
+      setTimeout(() => emitPlaybackGesture(true, targetTrack, syncedCurrentTime), 420);
+    }
+    sendAction({ type: "play_pause", playing: nextPlaying, currentTime: syncedCurrentTime });
   };
-  const handleSkip = () => sendAction({ type: "skip" });
-  const handlePrev = () => sendAction({ type: "prev_track" });
+  const handleSkip = () => {
+    emitPlaybackGesture(false, roomState?.currentTrack ?? null, roomState?.currentTime ?? 0);
+    sendAction({ type: "skip" });
+  };
+  const handlePrev = () => {
+    emitPlaybackGesture(false, roomState?.currentTrack ?? null, roomState?.currentTime ?? 0);
+    sendAction({ type: "prev_track" });
+  };
   const handleRepeat = () => sendAction({ type: "set_repeat" });
   const handleShuffle = () => sendAction({ type: "set_shuffle" });
   const handleToggleDemocracy = () => { if (isRealHost) sendAction({ type: "set_democracy" }); };
   const handlePlayerStateChange = (playing: boolean, currentTime: number) => {
-    if (!effectiveIsHost) return;
-    sendAction({ type: "seek", currentTime });
+    if (!playbackAuthority) return;
+    void playing;
+    sendAction({ type: "sync_time", currentTime });
   };
-  const handleTrackEnd = () => { if (effectiveIsHost) handleSkip(); };
+  const handleTrackEnd = () => { if (playbackAuthority) handleSkip(); };
   const handleSendMessage = (text: string) => sendAction({ type: "chat", text });
   const handleLeave = () => { setLocation("/"); };
 
@@ -862,8 +992,47 @@ export default function Room() {
           <div className="flex items-center gap-1.5 text-[10px] text-foreground/45">
             <span className="font-mono font-semibold tracking-wide">{roomId}</span>
             <span className="text-foreground/20">·</span>
-            <Users className="w-2.5 h-2.5" />
-            <span>{roomState?.listeners.length ?? 0}</span>
+            <div ref={listenersPopoverRef} className="relative">
+              <button
+                type="button"
+                onClick={() => setListenersOpen(v => !v)}
+                className="inline-flex items-center gap-1 rounded-md px-1 py-0.5 text-foreground/55 hover:bg-primary/10 hover:text-primary transition-colors"
+                title="Nguoi dang trong phong"
+              >
+                <Users className="w-2.5 h-2.5" />
+                <span>{roomState?.listeners.length ?? 0}</span>
+              </button>
+              {listenersOpen && (
+                <div className="absolute left-0 top-full mt-1.5 w-64 rounded-2xl border border-primary/15 bg-white/95 backdrop-blur p-2.5 shadow-xl z-50">
+                  <div className="mb-2 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/60">
+                    Nguoi da vao phong ({roomState?.listeners.length ?? 0})
+                  </div>
+                  <div className="max-h-56 overflow-y-auto space-y-1.5 pr-0.5">
+                    {(roomState?.listeners ?? []).map((name) => {
+                      const avatarUrl = roomState?.userAvatars?.[name];
+                      const initial = name.trim()[0]?.toUpperCase() || "?";
+                      const isCurrentUser = name === userName;
+                      return (
+                        <div key={name} className="flex items-center gap-2 rounded-xl border border-primary/10 bg-primary/5 px-2 py-1.5 text-[11px]">
+                          <div className="w-6 h-6 rounded-full overflow-hidden border border-primary/10 bg-white flex items-center justify-center">
+                            {avatarUrl
+                              ? <img src={avatarUrl} alt={name} className="w-full h-full object-cover" />
+                              : <span className="text-[10px] font-semibold text-primary/70">{initial}</span>}
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <div className="flex items-center gap-1.5">
+                              <span className="truncate font-medium text-foreground/80">{name}</span>
+                              {name === roomState?.hostName && <span className="text-[9px] font-bold text-primary">HOST</span>}
+                              {isCurrentUser && <span className="text-[9px] font-semibold text-muted-foreground/60">(you)</span>}
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+            </div>
             {isRealHost && (
               <>
                 <span className="text-foreground/20">·</span>
@@ -876,7 +1045,7 @@ export default function Room() {
                 <span className="text-[10px] font-semibold text-primary">🗳️ Dân chủ</span>
               </>
             )}
-            {streakData.streak > 0 && (
+            {(
               <>
                 <span className="text-foreground/20">·</span>
                 <span className="text-[10px] font-bold text-orange-500/80 flex items-center gap-0.5">
@@ -946,6 +1115,33 @@ export default function Room() {
         </div>
       </header>
 
+      {showBackgroundHint && (
+        <div className="md:hidden shrink-0 px-3 pt-2 z-20">
+          <div className="rounded-2xl border border-primary/15 bg-white/80 backdrop-blur-md px-3 py-2.5 shadow-sm flex items-start gap-2">
+            <div className="w-7 h-7 rounded-xl bg-primary/10 text-primary flex items-center justify-center shrink-0">
+              <Globe className="w-3.5 h-3.5" />
+            </div>
+            <div className="min-w-0 flex-1">
+              <p className="text-[11px] font-semibold text-foreground/80">Muốn nghe nền ổn định hơn?</p>
+              <p className="text-[10px] leading-relaxed text-muted-foreground/80">
+                Hãy mở phòng này bằng Cốc Cốc mobile hoặc thêm web ra màn hình chính để nghe nhạc nền, màn hình khóa ổn định hơn.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => {
+                setShowBackgroundHint(false);
+                try { localStorage.setItem("music-together-hide-bg-hint", "1"); } catch {}
+              }}
+              className="w-7 h-7 rounded-xl flex items-center justify-center text-muted-foreground/50 hover:bg-primary/8 hover:text-primary transition-colors shrink-0"
+              title="Đóng gợi ý"
+            >
+              <X className="w-3.5 h-3.5" />
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* ── Main ──────────────────────────────── */}
       <div className="flex-1 flex overflow-hidden min-h-0">
 
@@ -953,22 +1149,24 @@ export default function Room() {
         {(!compact || fullscreen) && (
           <div className={fullscreen
             ? "fixed inset-0 z-[200] bg-black flex flex-col"
-            : `${mobileShowPlayer ? "flex" : "hidden"} md:flex flex-1 flex-col min-w-0 overflow-y-auto min-h-0 p-5 gap-4`}>
+            : `${mobileShowPlayer ? "flex" : "hidden"} md:flex flex-1 flex-col min-w-0 min-h-0 p-5 gap-4 overflow-hidden`}>
 
             {/* YouTube player */}
             {showPlayer ? (
-              <div className={fullscreen ? "flex-1 min-h-0 relative" : ""}>
-                <YoutubePlayer
-                  currentTrack={roomState?.currentTrack || null}
-                  playing={roomState?.playing || false}
-                  serverTime={roomState?.currentTime || 0}
-                  isHost={effectiveIsHost}
-                  volume={volume}
-                  fullscreen={fullscreen}
-                  onStateChange={handlePlayerStateChange}
-                  onTrackEnd={handleTrackEnd}
-                  onTimeUpdate={(ct, dur) => { setPlayerCurrentTime(ct); setPlayerDuration(dur); }}
-                />
+              <div className={fullscreen ? "flex-1 min-h-0 relative" : "flex-1 min-h-0 relative flex items-start justify-center"}>
+                <div className={fullscreen ? "w-full h-full" : "w-full max-w-[min(100%,calc((100vh-340px)*16/9))] shrink-0"}>
+                  <YoutubePlayer
+                    currentTrack={roomState?.currentTrack || null}
+                    playing={roomState?.playing || false}
+                    serverTime={roomState?.currentTime || 0}
+                    isHost={playbackAuthority}
+                    volume={volume}
+                    fullscreen={fullscreen}
+                    onStateChange={handlePlayerStateChange}
+                    onTrackEnd={handleTrackEnd}
+                    onTimeUpdate={(ct, dur) => { setPlayerCurrentTime(ct); setPlayerDuration(dur); }}
+                  />
+                </div>
               </div>
             ) : !fullscreen && <WaitingIllustration />}
 
@@ -1078,13 +1276,18 @@ export default function Room() {
             chatMessages={roomState?.chatHistory || []}
             isHost={effectiveIsHost}
             currentUser={userName}
+            listeners={roomState?.listeners || []}
+            hostName={roomState?.hostName || ""}
             myAvatarUrl={myAvatarUrl || undefined}
             userAvatars={roomState?.userAvatars}
             onAddTrack={handleAddTrack}
             onRemoveTrack={handleRemoveTrack}
+            onMoveTrack={handleMoveTrack}
             onPlayTrack={handlePlayTrack}
             onRemoveCurrent={handleRemoveCurrent}
             onRemovePlayed={handleRemovePlayed}
+            onMovePlayed={handleMovePlayed}
+            onMovePlayedToQueue={handleMovePlayedToQueue}
             onReplayPlayed={handleReplayPlayed}
             onSendMessage={handleSendMessage}
             activities={activities}

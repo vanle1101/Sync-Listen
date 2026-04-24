@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Track } from "@/lib/types";
+import { getApiUrl } from "@/lib/runtime-config";
 import { useYoutubeSearch, getYoutubeSearchQueryKey } from "@workspace/api-client-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -63,7 +64,7 @@ export function SearchPanel({ onAddTrack }: SearchPanelProps) {
       // It's a YouTube URL — fetch video info directly
       setUrlLoading(true);
       try {
-        const res = await fetch(`/api/youtube/video/${videoId}`);
+        const res = await fetch(getApiUrl(`/api/youtube/video/${videoId}`));
         if (!res.ok) throw new Error("Không tìm thấy video");
         const video = await res.json();
         onAddTrack({

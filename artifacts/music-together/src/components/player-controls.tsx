@@ -110,6 +110,7 @@ export function PlayerControls({
         {/* Left: Volume */}
         <div className="flex items-center gap-2 flex-1">
           <button
+            type="button"
             className="text-primary/60 hover:text-primary transition-colors flex-shrink-0"
             onClick={() => onVolumeChange(volume === 0 ? 70 : 0)}
           >
@@ -136,6 +137,7 @@ export function PlayerControls({
 
           {/* Shuffle */}
           <button
+            type="button"
             className={iconBtn(hostActive) + (shuffle && hostActive ? ' !text-secondary !border-secondary/30' : '')}
             disabled={!hostActive}
             onClick={onShuffle}
@@ -146,6 +148,7 @@ export function PlayerControls({
 
           {/* Previous */}
           <button
+            type="button"
             className={iconBtn(hostActive)}
             disabled={!hostActive}
             onClick={onPrev}
@@ -156,6 +159,7 @@ export function PlayerControls({
 
           {/* Play/Pause — larger */}
           <Button
+            type="button"
             variant="outline"
             size="icon"
             className={`w-14 h-14 rounded-full border-primary/10 bg-white shadow-sm transition-all duration-300 ${
@@ -171,6 +175,7 @@ export function PlayerControls({
 
           {/* Next */}
           <button
+            type="button"
             className={iconBtn(hostActive)}
             disabled={!hostActive}
             onClick={onSkip}
@@ -181,6 +186,7 @@ export function PlayerControls({
 
           {/* Repeat */}
           <button
+            type="button"
             className={iconBtn(hostActive) + (repeatActive && hostActive ? ' !text-secondary !border-secondary/30' : '')}
             disabled={!hostActive}
             onClick={onRepeat}
@@ -200,6 +206,7 @@ export function PlayerControls({
           )}
           {onFullscreen && (
             <button
+              type="button"
               onClick={onFullscreen}
               title="Toàn màn hình"
               className="w-8 h-8 rounded-full border border-primary/20 bg-white shadow-sm hover:bg-primary/5 hover:scale-110 active:scale-95 text-primary/70 hover:text-primary flex items-center justify-center transition-all duration-200">

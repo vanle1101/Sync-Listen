@@ -15,11 +15,13 @@ export interface ErrorResponse {
 
 export interface CreateRoomBody {
   hostName: string;
+  roomName: string;
 }
 
 export interface Room {
   id: string;
   hostName: string;
+  roomName: string;
   createdAt: string;
 }
 

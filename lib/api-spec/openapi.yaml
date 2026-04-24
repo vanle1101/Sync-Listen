@@ -117,8 +117,11 @@ components:
       properties:
         hostName:
           type: string
+        roomName:
+          type: string
       required:
         - hostName
+        - roomName
 
     Room:
       type: object
@@ -127,11 +130,14 @@ components:
           type: string
         hostName:
           type: string
+        roomName:
+          type: string
         createdAt:
           type: string
       required:
         - id
         - hostName
+        - roomName
         - createdAt
 
     YoutubeVideo:

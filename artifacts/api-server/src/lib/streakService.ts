@@ -1,6 +1,9 @@
 import { db, roomSessionsTable, roomStreakFreezesTable } from "@workspace/db";
 import { eq, desc } from "drizzle-orm";
 
+const memorySessions = new Map<string, Set<string>>();
+const memoryFreezes = new Map<string, Set<string>>();
+
 function todayDateString(): string {
   return new Date().toISOString().slice(0, 10); // "YYYY-MM-DD"
 }
@@ -32,13 +35,15 @@ export function getMaxFreezes(streak: number): number {
 /** Record that roomId had ≥2 listeners today (idempotent). */
 export async function recordSession(roomId: string): Promise<void> {
   const date = todayDateString();
+  if (!memorySessions.has(roomId)) memorySessions.set(roomId, new Set<string>());
+  memorySessions.get(roomId)!.add(date);
   try {
     await db
       .insert(roomSessionsTable)
       .values({ roomId, sessionDate: date })
       .onConflictDoNothing();
   } catch {
-    // ignore duplicate
+    // DB unavailable; in-memory fallback is already updated above.
   }
 }
 
@@ -56,30 +61,41 @@ export interface StreakResult {
  * Freeze slots are determined by the streak length at the point of the gap.
  */
 export async function getStreak(roomId: string): Promise<StreakResult> {
-  const [sessionRows, freezeRows] = await Promise.all([
-    db
-      .select({ sessionDate: roomSessionsTable.sessionDate })
-      .from(roomSessionsTable)
-      .where(eq(roomSessionsTable.roomId, roomId))
-      .orderBy(desc(roomSessionsTable.sessionDate)),
-    db
-      .select({ frozenDate: roomStreakFreezesTable.frozenDate })
-      .from(roomStreakFreezesTable)
-      .where(eq(roomStreakFreezesTable.roomId, roomId)),
-  ]);
+  const memSessionDates = memorySessions.get(roomId) ?? new Set<string>();
+  const memFreezeDates = memoryFreezes.get(roomId) ?? new Set<string>();
+
+  let dbSessionDates = new Set<string>();
+  let dbFreezeDates = new Set<string>();
+  try {
+    const [sessionRows, freezeRows] = await Promise.all([
+      db
+        .select({ sessionDate: roomSessionsTable.sessionDate })
+        .from(roomSessionsTable)
+        .where(eq(roomSessionsTable.roomId, roomId))
+        .orderBy(desc(roomSessionsTable.sessionDate)),
+      db
+        .select({ frozenDate: roomStreakFreezesTable.frozenDate })
+        .from(roomStreakFreezesTable)
+        .where(eq(roomStreakFreezesTable.roomId, roomId)),
+    ]);
+    dbSessionDates = new Set(sessionRows.map((r) => r.sessionDate));
+    dbFreezeDates = new Set(freezeRows.map((r) => r.frozenDate));
+  } catch {
+    // DB unavailable; continue with in-memory fallback.
+  }
 
   const empty: StreakResult = { streak: 0, lastDate: null, maxFreezes: 0, freezesUsed: 0, freezesAvailable: 0 };
 
-  if (sessionRows.length === 0) return empty;
-
-  const sessionDates = new Set(sessionRows.map((r) => r.sessionDate));
-  const frozenDates = new Set(freezeRows.map((r) => r.frozenDate));
+  const sessionDates = new Set<string>([...dbSessionDates, ...memSessionDates]);
+  const frozenDates = new Set<string>([...dbFreezeDates, ...memFreezeDates]);
+  if (sessionDates.size === 0) return empty;
 
   // All "active" dates = sessions + already-frozen dates
   const allDates = new Set<string>([...sessionDates, ...frozenDates]);
 
   const today = todayDateString();
-  const mostRecentSession = sessionRows[0].sessionDate;
+  const sortedSessions = [...sessionDates].sort((a, b) => b.localeCompare(a));
+  const mostRecentSession = sortedSessions[0];
 
   // If the most recent session is more than 1 day ago, the streak is broken
   // (we only auto-freeze a 1-day gap within the streak, not between today and last session)
@@ -127,10 +143,16 @@ export async function getStreak(roomId: string): Promise<StreakResult> {
   // Persist any newly applied freezes
   for (const fd of newlyFrozen) {
     frozenDates.add(fd);
-    await db
-      .insert(roomStreakFreezesTable)
-      .values({ roomId, frozenDate: fd })
-      .onConflictDoNothing();
+    if (!memoryFreezes.has(roomId)) memoryFreezes.set(roomId, new Set<string>());
+    memoryFreezes.get(roomId)!.add(fd);
+    try {
+      await db
+        .insert(roomStreakFreezesTable)
+        .values({ roomId, frozenDate: fd })
+        .onConflictDoNothing();
+    } catch {
+      // DB unavailable; keep in memory.
+    }
   }
 
   const maxFreezesNow = getMaxFreezes(streak);

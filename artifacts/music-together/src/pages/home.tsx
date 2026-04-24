@@ -1,11 +1,13 @@
 import { useState, useEffect, useRef } from "react";
 import { useLocation } from "wouter";
-import { useCreateRoom } from "@workspace/api-client-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Loader2, Music, Clock, ArrowRight, X, Camera, LogOut } from "lucide-react";
 import { useUser, useClerk } from "@clerk/react";
+import { useToast } from "@/hooks/use-toast";
+import { getApiUrl } from "@/lib/runtime-config";
+import { extractNormalizedRoomId, normalizeRoomId } from "@/lib/room-id";
 
 interface RecentRoom {
   id: string;
@@ -20,6 +22,7 @@ interface ManualProfile {
 }
 
 const MANUAL_KEY = "music-together-manual-profile";
+const RECENT_JOIN_GESTURE_KEY = "music-together-recent-join-gesture-at";
 
 function loadManualProfile(): ManualProfile | null {
   try { return JSON.parse(localStorage.getItem(MANUAL_KEY) ?? "null"); } catch { return null; }
@@ -67,6 +70,7 @@ export default function Home() {
   const [, setLocation] = useLocation();
   const { user, isLoaded } = useUser();
   const { signOut } = useClerk();
+  const { toast } = useToast();
 
   /* ── Name & avatar ── */
   const isSignedIn = isLoaded && !!user;
@@ -82,7 +86,7 @@ export default function Home() {
   const [joinRoomId, setJoinRoomId] = useState("");
   const [newRoomName, setNewRoomName] = useState("");
   const [recentRooms, setRecentRooms] = useState<RecentRoom[]>([]);
-  const createRoom = useCreateRoom();
+  const [isCreatingRoom, setIsCreatingRoom] = useState(false);
 
   /* Load saved manual profile */
   useEffect(() => {
@@ -135,38 +139,63 @@ export default function Home() {
     if (finalAvatar) localStorage.setItem("music-together-avatar", finalAvatar);
     else localStorage.removeItem("music-together-avatar");
     if (!isSignedIn) saveManualProfile({ name: finalName, avatarUrl: manualAvatar || undefined });
+    try { sessionStorage.setItem(RECENT_JOIN_GESTURE_KEY, String(Date.now())); } catch {}
     setLocation(roomPath);
   };
 
-  const handleCreateRoom = (e: React.FormEvent) => {
+  const handleCreateRoom = async (e: React.FormEvent) => {
     e.preventDefault();
     const n = displayName.trim();
     const rn = newRoomName.trim();
-    if (!n || !rn) return;
-    createRoom.mutate({ data: { hostName: n, roomName: rn } }, {
-      onSuccess: (room) => persistAndGo(`/room/${room.id}`),
-    });
+    if (!n || !rn || isCreatingRoom) return;
+    setIsCreatingRoom(true);
+    try {
+      const res = await fetch(getApiUrl("/api/rooms"), {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ hostName: n, roomName: rn }),
+      });
+      const data = await res.json().catch(() => null) as { id?: string; error?: string } | null;
+      const roomId = data?.id;
+      if (!res.ok || !roomId) {
+        throw new Error(data?.error || `Tạo phòng thất bại (${res.status})`);
+      }
+      persistAndGo(`/room/${normalizeRoomId(roomId)}`);
+    } catch (err) {
+      let msg = err instanceof Error ? err.message : "Không thể tạo phòng mới. Vui lòng thử lại.";
+      if (/Failed to fetch/i.test(msg)) {
+        msg = "Không kết nối được máy chủ. Kiểm tra API đang chạy và tải lại trang.";
+      }
+      toast({
+        title: "Không tạo được phòng",
+        description: msg,
+        variant: "destructive",
+      });
+    } finally {
+      setIsCreatingRoom(false);
+    }
   };
 
   const handleJoinRoom = (e: React.FormEvent) => {
     e.preventDefault();
     const n = displayName.trim();
-    let id = joinRoomId.trim();
+    const id = extractNormalizedRoomId(joinRoomId);
     if (!n || !id) return;
-    if (id.includes("/room/")) id = id.split("/room/")[1];
     persistAndGo(`/room/${id}`);
   };
 
   const handleJoinRecent = (room: RecentRoom) => {
-    if (!displayName.trim()) { setJoinRoomId(room.id); return; }
-    persistAndGo(`/room/${room.id}`);
+    const normalizedId = normalizeRoomId(room.id);
+    if (!displayName.trim()) { setJoinRoomId(normalizedId); return; }
+    persistAndGo(`/room/${normalizedId}`);
   };
 
   const handleRemoveRecent = (e: React.MouseEvent, roomId: string) => {
     e.stopPropagation();
     try {
       const rooms: RecentRoom[] = JSON.parse(localStorage.getItem("music-together-rooms") ?? "[]");
-      const updated = rooms.filter(r => r.id !== roomId);
+      const normalizedId = normalizeRoomId(roomId);
+      const updated = rooms.filter(r => normalizeRoomId(r.id) !== normalizedId);
       localStorage.setItem("music-together-rooms", JSON.stringify(updated));
       setRecentRooms(updated);
     } catch {}
@@ -354,9 +383,9 @@ export default function Home() {
                 </div>
                 <Button
                   type="submit"
-                  disabled={!displayName.trim() || !newRoomName.trim() || createRoom.isPending}
+                  disabled={!displayName.trim() || !newRoomName.trim() || isCreatingRoom}
                   className="w-full h-14 text-lg font-medium rounded-2xl bg-primary hover:bg-primary/90 text-white shadow-[0_8px_20px_rgba(192,112,128,0.28)] transition-all hover:scale-[1.02] active:scale-[0.98]">
-                  {createRoom.isPending ? <Loader2 className="w-5 h-5 animate-spin" /> : "Tạo phòng mới"}
+                  {isCreatingRoom ? <Loader2 className="w-5 h-5 animate-spin" /> : "Tạo phòng mới"}
                 </Button>
               </form>
             </div>

@@ -6,7 +6,8 @@ if (!process.env.DATABASE_URL) {
 }
 
 export default defineConfig({
-  schema: path.join(__dirname, "./src/schema/index.ts"),
+  // Use a forward-slash glob so drizzle-kit resolves schema files reliably on Windows.
+  schema: path.resolve(__dirname, "./src/schema/*.ts").replaceAll("\\", "/"),
   dialect: "postgresql",
   dbCredentials: {
     url: process.env.DATABASE_URL,

@@ -2,10 +2,14 @@ import { WebSocket } from "ws";
 
 export interface Track {
   videoId: string;
+  source?: "youtube" | "soundcloud" | "upload";
   title: string;
   channelTitle: string;
   thumbnail: string;
   duration: string | null;
+  mediaUrl?: string;
+  mimeType?: string | null;
+  fileName?: string | null;
 }
 
 export interface ChatMessage {
@@ -27,6 +31,7 @@ export interface RoomState {
   currentTrack: Track | null;
   playing: boolean;
   currentTime: number;
+  playbackUpdatedAt: number;
   chatHistory: ChatMessage[];
   repeatMode: RepeatMode;
   shuffle: boolean;
@@ -54,6 +59,7 @@ export function getOrCreateRoomState(roomId: string, hostName: string, roomName 
       currentTrack: null,
       playing: false,
       currentTime: 0,
+      playbackUpdatedAt: Date.now(),
       chatHistory: [],
       repeatMode: 'all',
       shuffle: false,
@@ -119,6 +125,48 @@ export function sendToSocket(ws: WebSocket, message: object): void {
   if (ws.readyState === WebSocket.OPEN) {
     ws.send(JSON.stringify(message));
   }
+}
+
+export function getEffectiveCurrentTime(room: RoomState, nowMs = Date.now()): number {
+  if (!room.playing || !room.currentTrack) return Math.max(0, room.currentTime || 0);
+  const deltaSec = Math.max(0, (nowMs - room.playbackUpdatedAt) / 1000);
+  return Math.max(0, (room.currentTime || 0) + deltaSec);
+}
+
+export function updatePlaybackAnchor(
+  room: RoomState,
+  next: { currentTime?: number; playing?: boolean } = {},
+): void {
+  const now = Date.now();
+  const effectiveNow = getEffectiveCurrentTime(room, now);
+  room.currentTime = Number.isFinite(next.currentTime as number)
+    ? Math.max(0, next.currentTime as number)
+    : effectiveNow;
+  if (typeof next.playing === "boolean") {
+    room.playing = next.playing;
+  }
+  room.playbackUpdatedAt = now;
+}
+
+export function buildPlaybackPayload(room: RoomState) {
+  const now = Date.now();
+  return {
+    type: "playback",
+    playing: room.playing,
+    currentTime: getEffectiveCurrentTime(room, now),
+    videoId: room.currentTrack?.videoId ?? null,
+    currentTrack: room.currentTrack ?? null,
+    serverNow: now,
+  };
+}
+
+export function buildRoomStateForClient(room: RoomState): RoomState & { serverNow: number } {
+  const now = Date.now();
+  return {
+    ...room,
+    currentTime: getEffectiveCurrentTime(room, now),
+    serverNow: now,
+  };
 }
 
 /** Pick next track respecting shuffle. Returns undefined if no more tracks. */

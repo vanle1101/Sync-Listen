@@ -1,9 +1,13 @@
 export interface Track {
   videoId: string;
+  source?: "youtube" | "soundcloud" | "upload";
   title: string;
   channelTitle: string;
   thumbnail: string;
   duration: string | null;
+  mediaUrl?: string;
+  mimeType?: string | null;
+  fileName?: string | null;
 }
 
 export interface ChatMessage {
@@ -25,6 +29,7 @@ export interface RoomState {
   currentTrack: Track | null;
   playing: boolean;
   currentTime: number;
+  serverNow?: number;
   chatHistory: ChatMessage[];
   repeatMode: RepeatMode;
   shuffle: boolean;

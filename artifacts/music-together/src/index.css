@@ -89,7 +89,7 @@
   --input: 33 30% 92%;
   --ring: 345 32% 55%;
 
-  --app-font-sans: 'Nunito', sans-serif;
+  --app-font-sans: 'Nunito', 'Apple Color Emoji', 'Segoe UI Emoji', 'Noto Color Emoji', sans-serif;
   --app-font-serif: 'Lora', serif;
   --app-font-mono: monospace;
   --radius: 0.85rem;
@@ -157,7 +157,7 @@ a, button, [role="button"], input, select, textarea, label,
   --border-color: transparent;
   --background-rgb: 255, 252, 250;
   --category-icon-size: 18px;
-  --font-family: 'Nunito', sans-serif;
+  --font-family: 'Nunito', 'Apple Color Emoji', 'Segoe UI Emoji', 'Noto Color Emoji', sans-serif;
   --font-size: 13px;
   --color-border: transparent;
   --color-border-over: rgba(192, 112, 128, 0.15);

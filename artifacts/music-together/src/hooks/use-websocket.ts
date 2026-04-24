@@ -1,5 +1,16 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import { RoomState } from "../lib/types";
+import { getWebSocketUrl } from "@/lib/runtime-config";
+
+function getLatencyAdjustedTime(currentTime: unknown, playing: unknown, serverNow: unknown) {
+  const safeCurrentTime = Number(currentTime);
+  if (!Number.isFinite(safeCurrentTime) || safeCurrentTime < 0) return 0;
+  if (!playing) return safeCurrentTime;
+  const safeServerNow = Number(serverNow);
+  if (!Number.isFinite(safeServerNow) || safeServerNow <= 0) return safeCurrentTime;
+  const elapsedSec = Math.max(0, (Date.now() - safeServerNow) / 1000);
+  return safeCurrentTime + elapsedSec;
+}
 
 export function useWebSocket(roomId: string, userName: string | null, avatarUrl?: string | null) {
   const socketRef = useRef<WebSocket | null>(null);
@@ -19,10 +30,40 @@ export function useWebSocket(roomId: string, userName: string | null, avatarUrl?
   avatarUrlRef.current = avatarUrl;
 
   const sendAction = useCallback((action: any) => {
+    if (action?.type === "play_pause") {
+      setRoomState(prev => {
+        if (!prev) return prev;
+        const requestedTime = Number(action.currentTime);
+        return {
+          ...prev,
+          playing: typeof action.playing === "boolean" ? action.playing : prev.playing,
+          currentTime: Number.isFinite(requestedTime) ? requestedTime : prev.currentTime,
+        };
+      });
+    }
+
+    if (action?.type === "seek") {
+      setRoomState(prev => {
+        if (!prev) return prev;
+        const requestedTime = Number(action.currentTime);
+        if (!Number.isFinite(requestedTime)) return prev;
+        return {
+          ...prev,
+          currentTime: requestedTime,
+        };
+      });
+    }
+
     const ws = socketRef.current;
     if (ws && ws.readyState === WebSocket.OPEN) {
       ws.send(JSON.stringify(action));
     } else {
+      // Heartbeat/sync packets are ephemeral: drop while reconnecting to avoid stale rewinds.
+      if (action?.type === "sync_time") return;
+      // Keep only the latest play/pause while offline.
+      if (action?.type === "play_pause") {
+        pendingActions.current = pendingActions.current.filter(a => a?.type !== "play_pause");
+      }
       pendingActions.current.push(action);
       console.warn("[WS] queued action (reconnecting):", action.type);
     }
@@ -35,8 +76,7 @@ export function useWebSocket(roomId: string, userName: string | null, avatarUrl?
     const connect = () => {
       if (!mountedRef.current) return;
 
-      const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
-      const wsUrl = `${protocol}//${window.location.host}/ws`;
+      const wsUrl = getWebSocketUrl();
       const ws = new WebSocket(wsUrl);
       socketRef.current = ws;
 
@@ -59,7 +99,10 @@ export function useWebSocket(roomId: string, userName: string | null, avatarUrl?
           const msg = JSON.parse(event.data);
           switch (msg.type) {
             case "room_state":
-              setRoomState(msg.room);
+              setRoomState({
+                ...msg.room,
+                currentTime: getLatencyAdjustedTime(msg.room?.currentTime, msg.room?.playing, msg.room?.serverNow),
+              });
               break;
             case "chat":
               setRoomState(prev => prev ? {
@@ -71,7 +114,8 @@ export function useWebSocket(roomId: string, userName: string | null, avatarUrl?
               setRoomState(prev => prev ? {
                 ...prev,
                 playing: msg.playing,
-                currentTime: msg.currentTime,
+                currentTime: getLatencyAdjustedTime(msg.currentTime, msg.playing, msg.serverNow),
+                serverNow: Number.isFinite(Number(msg.serverNow)) ? Number(msg.serverNow) : prev.serverNow,
                 currentTrack: msg.currentTrack !== undefined
                   ? msg.currentTrack
                   : (msg.videoId
@@ -105,12 +149,35 @@ export function useWebSocket(roomId: string, userName: string | null, avatarUrl?
               setRoomClosed(true);
               break;
             case "listeners_update":
-              setRoomState(prev => prev ? {
-                ...prev,
-                listeners: msg.listeners,
-                hostName: msg.hostName,
-                userAvatars: msg.userAvatars ?? prev.userAvatars ?? {},
-              } : null);
+              setRoomState(prev => {
+                if (prev) {
+                  return {
+                    ...prev,
+                    listeners: msg.listeners,
+                    hostName: msg.hostName,
+                    userAvatars: msg.userAvatars ?? prev.userAvatars ?? {},
+                  };
+                }
+                // Allow listeners state to initialize before full room_state arrives,
+                // preventing UI from requiring manual refresh after join.
+                return {
+                  roomId: roomIdRef.current,
+                  hostName: (msg.hostName as string) ?? (userNameRef.current ?? ""),
+                  roomName: "",
+                  listeners: (msg.listeners as string[]) ?? [],
+                  userAvatars: (msg.userAvatars as Record<string, string>) ?? {},
+                  playlist: [],
+                  playedTracks: [],
+                  currentTrack: null,
+                  playing: false,
+                  currentTime: 0,
+                  serverNow: Date.now(),
+                  chatHistory: [],
+                  repeatMode: "all",
+                  shuffle: false,
+                  democracyMode: false,
+                };
+              });
               break;
             case "error":
               setError(msg.message);

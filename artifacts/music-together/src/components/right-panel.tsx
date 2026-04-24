@@ -1,7 +1,8 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import { Track, ChatMessage } from "@/lib/types";
+import { getApiUrl } from "@/lib/runtime-config";
 import { Input } from "@/components/ui/input";
-import { Send, Smile, X, Plus, Search, Loader2, Check, Trash2, Play, Bell, Mic, MicOff, ImagePlus, ChevronDown, Music2, Link } from "lucide-react";
+import { Send, Smile, X, Plus, Search, Loader2, Check, Trash2, Play, Bell, Mic, MicOff, ImagePlus, ChevronDown, Music2, Link, Upload, Download, GripVertical } from "lucide-react";
 import { useYoutubeSearch, getYoutubeSearchQueryKey } from "@workspace/api-client-react";
 import Picker from "@emoji-mart/react";
 import data from "@emoji-mart/data";
@@ -131,14 +132,19 @@ interface RightPanelProps {
   currentTrack: Track | null;
   chatMessages: ChatMessage[];
   isHost: boolean;
+  listeners: string[];
+  hostName: string;
   currentUser: string;
   myAvatarUrl?: string;
   userAvatars?: Record<string, string>;
   onAddTrack: (t: Track) => void;
   onRemoveTrack: (i: number) => void;
+  onMoveTrack: (fromIndex: number, toIndex: number) => void;
   onPlayTrack: (i: number) => void;
   onRemoveCurrent: () => void;
   onRemovePlayed: (i: number) => void;
+  onMovePlayed: (fromIndex: number, toIndex: number) => void;
+  onMovePlayedToQueue: (fromPlayedIndex: number, toQueueIndex: number) => void;
   onReplayPlayed: (i: number) => void;
   onSendMessage: (text: string) => void;
   activities: Activity[];
@@ -146,9 +152,9 @@ interface RightPanelProps {
 
 /* ─── RightPanel ────────────────────────────────────── */
 export function RightPanel({
-  playlist, playedTracks, currentTrack, chatMessages, isHost, currentUser,
+  playlist, playedTracks, currentTrack, chatMessages, isHost, listeners, hostName, currentUser,
   myAvatarUrl, userAvatars,
-  onAddTrack, onRemoveTrack, onPlayTrack, onRemoveCurrent, onRemovePlayed, onReplayPlayed, onSendMessage, activities,
+  onAddTrack, onRemoveTrack, onMoveTrack, onPlayTrack, onRemoveCurrent, onRemovePlayed, onMovePlayed, onMovePlayedToQueue, onReplayPlayed, onSendMessage, activities,
 }: RightPanelProps) {
   const [tab, setTab] = useState<"playlist" | "chat">("playlist");
   const [unreadChat, setUnreadChat] = useState(0);
@@ -192,25 +198,81 @@ export function RightPanel({
 
       {/* ── Tab content ── */}
       {tab === "playlist"
-        ? <PlaylistTab playlist={playlist} playedTracks={playedTracks} currentTrack={currentTrack} isHost={isHost} onAddTrack={onAddTrack} onRemoveTrack={onRemoveTrack} onPlayTrack={onPlayTrack} onRemoveCurrent={onRemoveCurrent} onRemovePlayed={onRemovePlayed} onReplayPlayed={onReplayPlayed} />
-        : <ChatTab messages={chatMessages} currentUser={currentUser} myAvatarUrl={myAvatarUrl} userAvatars={userAvatars} onSendMessage={onSendMessage} />}
+        ? <PlaylistTab playlist={playlist} playedTracks={playedTracks} currentTrack={currentTrack} isHost={isHost} listeners={listeners} hostName={hostName} userAvatars={userAvatars} onAddTrack={onAddTrack} onRemoveTrack={onRemoveTrack} onMoveTrack={onMoveTrack} onPlayTrack={onPlayTrack} onRemoveCurrent={onRemoveCurrent} onRemovePlayed={onRemovePlayed} onMovePlayed={onMovePlayed} onMovePlayedToQueue={onMovePlayedToQueue} onReplayPlayed={onReplayPlayed} />
+        : <ChatTab messages={chatMessages} currentUser={currentUser} myAvatarUrl={myAvatarUrl} userAvatars={userAvatars} onSendMessage={onSendMessage} activities={activities} />}
     </div>
   );
 }
 
 /* ─── Playlist Tab ──────────────────────────────────── */
-function PlaylistTab({ playlist, playedTracks, currentTrack, isHost, onAddTrack, onRemoveTrack, onPlayTrack, onRemoveCurrent, onRemovePlayed, onReplayPlayed }: {
-  playlist: Track[]; playedTracks: Track[]; currentTrack: Track | null; isHost: boolean;
-  onAddTrack: (t: Track) => void; onRemoveTrack: (i: number) => void; onPlayTrack: (i: number) => void;
-  onRemoveCurrent: () => void; onRemovePlayed: (i: number) => void; onReplayPlayed: (i: number) => void;
+function PlaylistTab({ playlist, playedTracks, currentTrack, isHost, listeners, hostName, userAvatars, onAddTrack, onRemoveTrack, onMoveTrack, onPlayTrack, onRemoveCurrent, onRemovePlayed, onMovePlayed, onMovePlayedToQueue, onReplayPlayed }: {
+  playlist: Track[]; playedTracks: Track[]; currentTrack: Track | null; isHost: boolean; listeners: string[]; hostName: string; userAvatars?: Record<string, string>;
+  onAddTrack: (t: Track) => void; onRemoveTrack: (i: number) => void; onMoveTrack: (fromIndex: number, toIndex: number) => void; onPlayTrack: (i: number) => void;
+  onRemoveCurrent: () => void; onRemovePlayed: (i: number) => void; onMovePlayed: (fromIndex: number, toIndex: number) => void; onMovePlayedToQueue: (fromPlayedIndex: number, toQueueIndex: number) => void; onReplayPlayed: (i: number) => void;
 }) {
   const [query, setQuery] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
   const [addedIds, setAddedIds] = useState<Set<string>>(new Set());
   const [mode, setMode] = useState<"queue" | "search">("queue");
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [urlLoading, setUrlLoading] = useState(false);
+  const [uploadLoading, setUploadLoading] = useState(false);
   const [urlError, setUrlError] = useState<string | null>(null);
+  const [dragging, setDragging] = useState<{ list: "played" | "queue"; index: number } | null>(null);
+  const [dragOver, setDragOver] = useState<{ list: "played" | "queue"; index: number } | null>(null);
+
+  const canDropOnList = (targetList: "played" | "queue"): boolean => {
+    if (!dragging) return false;
+    if (dragging.list === targetList) return true;
+    // Allow promoting a played track back into queue by drag-drop.
+    if (dragging.list === "played" && targetList === "queue") return true;
+    return false;
+  };
+
+  const handleDragStart = (list: "played" | "queue", index: number) => (e: React.DragEvent<HTMLDivElement>) => {
+    if (!isHost) return;
+    setDragging({ list, index });
+    setDragOver({ list, index });
+    e.dataTransfer.effectAllowed = "move";
+    try { e.dataTransfer.setData("text/plain", `${list}:${index}`); } catch {}
+  };
+
+  const handleDragOver = (list: "played" | "queue", index: number) => (e: React.DragEvent<HTMLDivElement>) => {
+    if (!isHost || !canDropOnList(list)) return;
+    e.preventDefault();
+    e.dataTransfer.dropEffect = "move";
+    if (dragOver?.list !== list || dragOver.index !== index) {
+      setDragOver({ list, index });
+    }
+  };
+
+  const handleDrop = (list: "played" | "queue", index: number) => (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    if (!isHost || !dragging || !canDropOnList(list)) {
+      setDragging(null);
+      setDragOver(null);
+      return;
+    }
+    if (dragging.list === list) {
+      const fromIndex = dragging.index;
+      const toIndex = index;
+      if (fromIndex !== toIndex) {
+        if (list === "played") onMovePlayed(fromIndex, toIndex);
+        else onMoveTrack(fromIndex, toIndex);
+      }
+    } else if (dragging.list === "played" && list === "queue") {
+      const toQueueIndex = Math.max(0, Math.min(index, playlist.length));
+      onMovePlayedToQueue(dragging.index, toQueueIndex);
+    }
+    setDragging(null);
+    setDragOver(null);
+  };
+
+  const handleDragEnd = () => {
+    setDragging(null);
+    setDragOver(null);
+  };
 
   useEffect(() => {
     if (!isHost) { setMode("queue"); setQuery(""); setSearchQuery(""); setUrlError(null); }
@@ -232,18 +294,60 @@ function PlaylistTab({ playlist, playedTracks, currentTrack, isHost, onAddTrack,
     return null;
   };
 
+  const isSoundCloudLink = (s: string): boolean => {
+    try {
+      const trimmed = s.trim();
+      if (!trimmed) return false;
+      const url = new URL(trimmed.startsWith("http") ? trimmed : `https://${trimmed}`);
+      const host = url.hostname.toLowerCase();
+      return (
+        host === "snd.sc" ||
+        host === "soundcloud.app.goo.gl" ||
+        host === "on.soundcloud.com" ||
+        host === "soundcloud.com" ||
+        host.endsWith(".soundcloud.com")
+      );
+    } catch {
+      return false;
+    }
+  };
+
+  const isSpotifyLink = (s: string): boolean => {
+    try {
+      const trimmed = s.trim();
+      if (!trimmed) return false;
+      const url = new URL(trimmed.startsWith("http") ? trimmed : `https://${trimmed}`);
+      const host = url.hostname.toLowerCase();
+      return host === "open.spotify.com" || host === "spotify.link" || host === "spoti.fi" || host.endsWith(".spotify.com");
+    } catch {
+      return false;
+    }
+  };
+
   const isYoutubeUrl = !!extractVideoId(query.trim());
+  const isSoundCloudUrl = isSoundCloudLink(query.trim());
+  const isSpotifyUrl = isSpotifyLink(query.trim());
 
   const { data: results, isLoading: searchLoading } = useYoutubeSearch(
     { q: searchQuery },
-    { query: { enabled: !!searchQuery && !isYoutubeUrl, queryKey: getYoutubeSearchQueryKey({ q: searchQuery }) } }
+    { query: { enabled: !!searchQuery && !isYoutubeUrl && !isSoundCloudUrl && !isSpotifyUrl, queryKey: getYoutubeSearchQueryKey({ q: searchQuery }) } }
   );
 
-  const isLoading = searchLoading || urlLoading;
+  const isLoading = searchLoading || urlLoading || uploadLoading;
 
   const markAdded = (videoId: string) => {
     setAddedIds(prev => new Set([...prev, videoId]));
     setTimeout(() => setAddedIds(prev => { const n = new Set(prev); n.delete(videoId); return n; }), 2000);
+  };
+
+  const readErrorMessage = async (res: Response, fallback: string): Promise<string> => {
+    try {
+      const payload = await res.json();
+      if (payload && typeof payload.error === "string" && payload.error.trim()) {
+        return payload.error;
+      }
+    } catch {}
+    return fallback;
   };
 
   const handleSearch = async (e: React.FormEvent) => {
@@ -255,15 +359,45 @@ function PlaylistTab({ playlist, playedTracks, currentTrack, isHost, onAddTrack,
     if (videoId) {
       setUrlLoading(true);
       try {
-        const res = await fetch(`/api/youtube/video/${videoId}`);
-        if (!res.ok) throw new Error();
+        const res = await fetch(getApiUrl(`/api/youtube/video/${videoId}`));
+        if (!res.ok) throw new Error(await readErrorMessage(res, "Request failed"));
         const video = await res.json();
-        onAddTrack({ videoId: video.videoId, title: video.title, channelTitle: video.channelTitle, thumbnail: video.thumbnail, duration: video.duration });
+        onAddTrack({ videoId: video.videoId, source: "youtube", title: video.title, channelTitle: video.channelTitle, thumbnail: video.thumbnail, duration: video.duration });
         markAdded(video.videoId);
         setQuery("");
         setMode("queue");
-      } catch {
-        setUrlError("Không tải được video. Thử lại nhé!");
+      } catch (err) {
+        setUrlError(err instanceof Error && err.message !== "Request failed" ? err.message : "Không tải được video. Thử lại nhé!");
+      } finally {
+        setUrlLoading(false);
+      }
+    } else if (isSoundCloudLink(q)) {
+      setUrlLoading(true);
+      try {
+        const res = await fetch(getApiUrl(`/api/soundcloud/resolve?url=${encodeURIComponent(q)}`));
+        if (!res.ok) throw new Error(await readErrorMessage(res, "Request failed"));
+        const track = await res.json();
+        onAddTrack(track);
+        markAdded(track.videoId);
+        setQuery("");
+        setMode("queue");
+      } catch (err) {
+        setUrlError(err instanceof Error && err.message !== "Request failed" ? err.message : "Khong resolve duoc link SoundCloud.");
+      } finally {
+        setUrlLoading(false);
+      }
+    } else if (isSpotifyLink(q)) {
+      setUrlLoading(true);
+      try {
+        const res = await fetch(getApiUrl(`/api/spotify/resolve?url=${encodeURIComponent(q)}`));
+        if (!res.ok) throw new Error(await readErrorMessage(res, "Request failed"));
+        const track = await res.json();
+        onAddTrack(track);
+        markAdded(track.videoId);
+        setQuery("");
+        setMode("queue");
+      } catch (err) {
+        setUrlError(err instanceof Error && err.message !== "Request failed" ? err.message : "Khong resolve duoc link Spotify.");
       } finally {
         setUrlLoading(false);
       }
@@ -273,8 +407,63 @@ function PlaylistTab({ playlist, playedTracks, currentTrack, isHost, onAddTrack,
     }
   };
   const handleAdd = (video: any) => {
-    onAddTrack({ videoId: video.videoId, title: video.title, channelTitle: video.channelTitle, thumbnail: video.thumbnail, duration: video.duration });
+    onAddTrack({ videoId: video.videoId, source: "youtube", title: video.title, channelTitle: video.channelTitle, thumbnail: video.thumbnail, duration: video.duration });
     markAdded(video.videoId);
+  };
+  const handleUploadFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+    setUrlError(null);
+    setUploadLoading(true);
+    try {
+      const dataUrl = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(String(reader.result || ""));
+        reader.onerror = () => reject(new Error("read failed"));
+        reader.readAsDataURL(file);
+      });
+      const res = await fetch(getApiUrl("/api/media/upload"), {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          fileName: file.name,
+          mimeType: file.type,
+          dataUrl,
+          title: file.name.replace(/\.[^.]+$/, ""),
+          userName: hostName || "Uploaded file",
+        }),
+      });
+      if (!res.ok) throw new Error(await readErrorMessage(res, "Request failed"));
+      const track = await res.json();
+      onAddTrack(track);
+      markAdded(track.videoId);
+      setMode("queue");
+    } catch (err) {
+      setUrlError(err instanceof Error && err.message !== "Request failed" ? err.message : "Upload that bai. Chi ho tro file audio/video.");
+    } finally {
+      setUploadLoading(false);
+    }
+  };
+  const downloadTrack = (track: Track) => {
+    if (track.source !== "upload" || !track.mediaUrl) {
+      alert("Hien chi tai offline duoc voi file ban da upload.");
+      return;
+    }
+    const chosen = (window.prompt("Chon dinh dang tai (mp3 hoac mp4)", "mp3") || "").trim().toLowerCase();
+    if (chosen !== "mp3" && chosen !== "mp4") return;
+    const mime = track.mimeType ?? "";
+    const canMp3 = mime.includes("mpeg") || (track.fileName?.toLowerCase().endsWith(".mp3") ?? false);
+    const canMp4 = mime.includes("mp4") || (track.fileName?.toLowerCase().endsWith(".mp4") ?? false);
+    if ((chosen === "mp3" && !canMp3) || (chosen === "mp4" && !canMp4)) {
+      alert("File nay chua ho tro chuyen doi dinh dang. Hay tai dung dinh dang goc.");
+      return;
+    }
+    const fileName = decodeURIComponent((track.mediaUrl.split("/").pop() || "").split("?")[0]);
+    const dl = getApiUrl(`/api/media/files/${encodeURIComponent(fileName)}?download=1&name=${encodeURIComponent(track.title)}&format=${chosen}`);
+    const a = document.createElement("a");
+    a.href = dl;
+    a.click();
   };
   const clearSearch = () => { setQuery(""); setSearchQuery(""); setMode("queue"); setUrlError(null); };
 
@@ -282,9 +471,10 @@ function PlaylistTab({ playlist, playedTracks, currentTrack, isHost, onAddTrack,
     <div className="flex flex-col flex-1 min-h-0">
       {isHost && (
         <div className="p-3 border-b border-primary/5 bg-white/40 shrink-0">
+          <input ref={fileInputRef} type="file" accept="audio/*,video/*" className="hidden" onChange={handleUploadFile} />
           <form onSubmit={handleSearch} className="flex gap-2">
             <div className="relative flex-1">
-              {isYoutubeUrl
+              {(isYoutubeUrl || isSoundCloudUrl || isSpotifyUrl)
                 ? <Link className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-primary/60" />
                 : <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-primary/40" />}
               <Input value={query} onChange={e => { setQuery(e.target.value); setUrlError(null); }}
@@ -295,11 +485,20 @@ function PlaylistTab({ playlist, playedTracks, currentTrack, isHost, onAddTrack,
               className="w-10 h-10 rounded-2xl bg-primary/10 hover:bg-primary text-primary hover:text-white flex items-center justify-center transition-all shrink-0 disabled:opacity-50">
               {urlLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-5 h-5" />}
             </button>
+            <button type="button" onClick={() => fileInputRef.current?.click()} disabled={isLoading}
+              className="w-10 h-10 rounded-2xl bg-secondary/10 hover:bg-secondary text-secondary hover:text-white flex items-center justify-center transition-all shrink-0 disabled:opacity-50"
+              title="Tải file từ máy">
+              {uploadLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
+            </button>
           </form>
-          {isYoutubeUrl && !urlError && (
+          {(isYoutubeUrl || isSoundCloudUrl || isSpotifyUrl) && !urlError && (
             <p className="text-[11px] text-primary/60 mt-1 pl-1 flex items-center gap-1">
               <span className="w-1.5 h-1.5 bg-primary/50 rounded-full inline-block" />
-              Link YouTube — nhấn + để thêm ngay
+              {isSoundCloudUrl
+                ? "Link SoundCloud - nhan + de them ngay"
+                : isSpotifyUrl
+                  ? "Link Spotify - se map sang ban YouTube de phat"
+                  : "Link YouTube - nhan + de them ngay"}
             </p>
           )}
           {urlError && <p className="text-[11px] text-red-400 mt-1 pl-1">{urlError}</p>}
@@ -343,7 +542,9 @@ function PlaylistTab({ playlist, playedTracks, currentTrack, isHost, onAddTrack,
             <p className="text-center text-xs text-muted-foreground/50 p-8 italic">Không tìm thấy "{searchQuery}"</p>
           ) : null
         ) : (
-          !currentTrack && playlist.length === 0 && playedTracks.length === 0 ? (
+          <>
+
+          {!currentTrack && playlist.length === 0 && playedTracks.length === 0 ? (
             <div className="flex flex-col items-center justify-center text-center py-12 px-4 gap-4">
               <div className="w-20 h-20 rounded-full flex items-center justify-center"
                 style={{ background: "linear-gradient(135deg, #fdf6f0, #fce8e8)" }}>
@@ -368,7 +569,25 @@ function PlaylistTab({ playlist, playedTracks, currentTrack, isHost, onAddTrack,
                   </p>
                   {playedTracks.map((track, i) => (
                     <div key={`played-${track.videoId}-${i}`}
-                      className="group flex items-center gap-2.5 p-2.5 rounded-2xl hover:bg-white/60 hover:opacity-100 opacity-50 transition-all">
+                      draggable={isHost}
+                      onDragStart={handleDragStart("played", i)}
+                      onDragOver={handleDragOver("played", i)}
+                      onDrop={handleDrop("played", i)}
+                      onDragEnd={handleDragEnd}
+                      className={`group flex items-center gap-2.5 p-2.5 rounded-2xl transition-all ${
+                        dragOver?.list === "played" && dragOver.index === i
+                          ? "ring-2 ring-primary/30 bg-primary/5"
+                          : "hover:bg-white/60"
+                      } ${
+                        dragging?.list === "played" && dragging.index === i
+                          ? "opacity-25"
+                          : "hover:opacity-100 opacity-50"
+                      } ${isHost ? "cursor-grab active:cursor-grabbing" : ""}`}>
+                      {isHost && (
+                        <div className="w-5 h-8 shrink-0 rounded-lg flex items-center justify-center text-muted-foreground/30">
+                          <GripVertical className="w-3.5 h-3.5" />
+                        </div>
+                      )}
                       <div className="relative w-12 h-10 rounded-xl overflow-hidden flex-shrink-0 shrink-0">
                         <img src={track.thumbnail} alt="" className="w-full h-full object-cover grayscale group-hover:grayscale-0 transition-all" />
                         <div className="absolute inset-0 bg-black/20 flex items-center justify-center">
@@ -379,8 +598,16 @@ function PlaylistTab({ playlist, playedTracks, currentTrack, isHost, onAddTrack,
                         <p className="text-xs font-medium text-foreground/70 line-clamp-1">{track.title}</p>
                         <p className="text-[10px] text-muted-foreground/50">{track.channelTitle}</p>
                       </div>
-                      {isHost && (
-                        <div className="flex items-center gap-1 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <div className="flex items-center gap-1 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
+                        {track.source === "upload" && track.mediaUrl && (
+                          <button onClick={() => downloadTrack(track)}
+                            className="w-7 h-7 rounded-xl text-secondary/70 hover:text-white hover:bg-secondary flex items-center justify-center transition-all"
+                            title="Tải offline">
+                            <Download className="w-3.5 h-3.5" />
+                          </button>
+                        )}
+                        {isHost && (
+                          <>
                           <button onClick={() => onReplayPlayed(i)}
                             className="w-7 h-7 rounded-xl text-primary/60 hover:text-white hover:bg-primary flex items-center justify-center transition-all"
                             title="Phát lại">
@@ -391,8 +618,9 @@ function PlaylistTab({ playlist, playedTracks, currentTrack, isHost, onAddTrack,
                             title="Xóa khỏi lịch sử">
                             <X className="w-3.5 h-3.5" />
                           </button>
-                        </div>
-                      )}
+                          </>
+                        )}
+                      </div>
                     </div>
                   ))}
                   {currentTrack && <div className="h-px bg-primary/10 mx-1" />}
@@ -415,27 +643,74 @@ function PlaylistTab({ playlist, playedTracks, currentTrack, isHost, onAddTrack,
                     <p className="text-xs font-semibold text-primary line-clamp-1">{currentTrack.title}</p>
                     <p className="text-[10px] text-muted-foreground/60">{currentTrack.channelTitle}</p>
                   </div>
-                  {isHost && (
-                    <button onClick={onRemoveCurrent}
-                      className="w-7 h-7 rounded-xl text-muted-foreground/30 hover:text-red-500 hover:bg-red-50 flex items-center justify-center transition-all shrink-0 opacity-0 group-hover:opacity-100"
-                      title="Bỏ qua bài này">
-                      <X className="w-3.5 h-3.5" />
-                    </button>
-                  )}
+                  <div className="flex items-center gap-1 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
+                    {currentTrack.source === "upload" && currentTrack.mediaUrl && (
+                      <button onClick={() => downloadTrack(currentTrack)}
+                        className="w-7 h-7 rounded-xl text-secondary/70 hover:text-white hover:bg-secondary flex items-center justify-center transition-all"
+                        title="Tải offline">
+                        <Download className="w-3.5 h-3.5" />
+                      </button>
+                    )}
+                    {isHost && (
+                      <button onClick={onRemoveCurrent}
+                        className="w-7 h-7 rounded-xl text-muted-foreground/30 hover:text-red-500 hover:bg-red-50 flex items-center justify-center transition-all"
+                        title="Bỏ qua bài này">
+                        <X className="w-3.5 h-3.5" />
+                      </button>
+                    )}
+                  </div>
                 </div>
               )}
-              {playlist.length > 0 && (
+              {(playlist.length > 0 || (isHost && dragging?.list === "played")) && (
                 <p className="text-[10px] font-semibold text-muted-foreground/40 uppercase tracking-wider px-1 pt-1">Tiếp theo</p>
               )}
+              {isHost && dragging && (dragging.list === "played" || dragging.list === "queue") && (
+                <div
+                  onDragOver={handleDragOver("queue", playlist.length)}
+                  onDrop={handleDrop("queue", playlist.length)}
+                  className={`mx-1 rounded-xl border border-dashed px-3 py-2 text-[11px] transition-all ${
+                    dragOver?.list === "queue" && dragOver.index === playlist.length
+                      ? "border-primary/50 bg-primary/10 text-primary"
+                      : "border-primary/20 text-muted-foreground/50"
+                  }`}
+                >
+                  {playlist.length === 0 ? "Thả vào đây để chuyển từ Đã phát sang Tiếp theo" : "Thả vào đây để đưa xuống cuối Tiếp theo"}
+                </div>
+              )}
               {playlist.map((track, i) => (
-                <div key={`${track.videoId}-${i}`} className="flex items-center gap-2 p-2.5 rounded-2xl hover:bg-white border border-transparent hover:shadow-sm hover:border-primary/10 transition-all">
+                <div key={`${track.videoId}-${i}`}
+                  draggable={isHost}
+                  onDragStart={handleDragStart("queue", i)}
+                  onDragOver={handleDragOver("queue", i)}
+                  onDrop={handleDrop("queue", i)}
+                  onDragEnd={handleDragEnd}
+                  className={`group flex items-center gap-2 p-2.5 rounded-2xl border border-transparent transition-all ${
+                    dragOver?.list === "queue" && dragOver.index === i
+                      ? "ring-2 ring-primary/30 bg-primary/5"
+                      : "hover:bg-white hover:shadow-sm hover:border-primary/10"
+                  } ${
+                    dragging?.list === "queue" && dragging.index === i ? "opacity-40" : ""
+                  } ${isHost ? "cursor-grab active:cursor-grabbing" : ""}`}>
+                  {isHost && (
+                    <div className="w-5 h-8 shrink-0 rounded-lg flex items-center justify-center text-muted-foreground/35">
+                      <GripVertical className="w-3.5 h-3.5" />
+                    </div>
+                  )}
                   <img src={track.thumbnail} alt="" className="w-12 h-10 rounded-xl object-cover flex-shrink-0" />
                   <div className="flex-1 min-w-0">
                     <p className="text-xs font-semibold text-foreground line-clamp-2 leading-snug">{track.title}</p>
                     <p className="text-[10px] text-muted-foreground/60 mt-0.5">{track.channelTitle}</p>
                   </div>
+                  <div className="flex items-center gap-1 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
+                    {track.source === "upload" && track.mediaUrl && (
+                      <button onClick={() => downloadTrack(track)}
+                        className="w-7 h-7 rounded-xl text-secondary/70 hover:text-white hover:bg-secondary flex items-center justify-center transition-all"
+                        title="Tải offline">
+                        <Download className="w-3.5 h-3.5" />
+                      </button>
+                    )}
                   {isHost && (
-                    <div className="flex items-center gap-1 shrink-0">
+                    <>
                       <button onClick={() => onPlayTrack(i)}
                         className="w-7 h-7 rounded-xl text-primary/60 hover:text-white hover:bg-primary flex items-center justify-center transition-all"
                         title="Phát ngay">
@@ -446,12 +721,14 @@ function PlaylistTab({ playlist, playedTracks, currentTrack, isHost, onAddTrack,
                         title="Xóa khỏi hàng đợi">
                         <Trash2 className="w-3.5 h-3.5" />
                       </button>
-                    </div>
+                    </>
                   )}
+                  </div>
                 </div>
               ))}
             </div>
-          )
+          )}
+          </>
         )}
       </div>
     </div>
@@ -459,10 +736,11 @@ function PlaylistTab({ playlist, playedTracks, currentTrack, isHost, onAddTrack,
 }
 
 /* ─── Chat Tab ──────────────────────────────────────── */
-function ChatTab({ messages, currentUser, myAvatarUrl, userAvatars, onSendMessage }: {
+function ChatTab({ messages, currentUser, myAvatarUrl, userAvatars, onSendMessage, activities }: {
   messages: ChatMessage[]; currentUser: string;
   myAvatarUrl?: string; userAvatars?: Record<string, string>;
   onSendMessage: (t: string) => void;
+  activities: Activity[];
 }) {
   const [text, setText] = useState("");
   const [emojiOpen, setEmojiOpen] = useState(false);
@@ -478,7 +756,9 @@ function ChatTab({ messages, currentUser, myAvatarUrl, userAvatars, onSendMessag
 
   useEffect(() => {
     if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
-  }, [messages]);
+  }, [messages, activities]);
+
+  const joinActivities = activities.filter((item) => item.text.includes("đã vào phòng"));
 
   useEffect(() => {
     if (!emojiOpen) return;
@@ -561,7 +841,7 @@ function ChatTab({ messages, currentUser, myAvatarUrl, userAvatars, onSendMessag
     <div className="flex flex-col flex-1 min-h-0">
       {/* ── Messages ── */}
       <div ref={scrollRef} className="flex-1 overflow-y-auto p-4 min-h-0">
-        {messages.length === 0 ? (
+        {messages.length === 0 && joinActivities.length === 0 ? (
           <div className="h-full flex flex-col items-center justify-center text-center gap-4 py-8 select-none">
             {/* Cute chat bubble SVG */}
             <div className="w-36 h-36 rounded-3xl flex items-center justify-center" style={{ background: "linear-gradient(135deg, #fdf6f0, #fce8e8)" }}>
@@ -594,6 +874,21 @@ function ChatTab({ messages, currentUser, myAvatarUrl, userAvatars, onSendMessag
           </div>
         ) : (
           <div className="space-y-3">
+            {joinActivities.map((activity, i) => (
+              <div
+                key={`activity-${i}-${activity.time}`}
+                className="flex items-center gap-2 rounded-[1.35rem] border border-[#e8d7cf] bg-[#fbf7f4] px-4 py-3 shadow-[0_2px_10px_rgba(180,120,90,0.06)] animate-in fade-in slide-in-from-bottom-2 duration-300"
+              >
+                <div className="w-6 h-6 rounded-full bg-white text-[#c27b63] flex items-center justify-center shrink-0 border border-[#eddcd4]">
+                  <Bell className="w-3.5 h-3.5" />
+                </div>
+                <div className="min-w-0 flex-1 flex items-center gap-2 text-[13px] text-foreground/80">
+                  <span className="shrink-0">🎉</span>
+                  <span className="truncate font-medium">{activity.text}</span>
+                </div>
+                <span className="text-[10px] text-muted-foreground/45 shrink-0">{activity.time}</span>
+              </div>
+            ))}
             {messages.map((msg, i) => {
               const isMe = msg.userName === currentUser;
               const date = new Date(msg.timestamp);
@@ -640,7 +935,7 @@ function ChatTab({ messages, currentUser, myAvatarUrl, userAvatars, onSendMessag
       {/* ── Emoji picker ── */}
       {emojiOpen && (
         <div ref={emojiRef} className="border-t border-primary/5 shrink-0 emoji-picker-wrapper">
-          <Picker data={data} set="facebook" theme="light" locale="vi"
+          <Picker data={data} set="native" theme="light" locale="vi"
             previewPosition="none" skinTonePosition="none" navPosition="bottom" perLine={8}
             onEmojiSelect={insertEmoji}
             style={{ width: "100%", border: "none", borderRadius: 0, boxShadow: "none" }} />

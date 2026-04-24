@@ -9,5 +9,6 @@
 export interface Room {
   id: string;
   hostName: string;
+  roomName: string;
   createdAt: string;
 }

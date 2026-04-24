@@ -25,10 +25,17 @@ app.use(
 app.use(CLERK_PROXY_PATH, clerkProxyMiddleware());
 
 app.use(cors({ credentials: true, origin: true }));
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+app.use(express.json({ limit: "200mb" }));
+app.use(express.urlencoded({ extended: true, limit: "5mb" }));
 
-app.use(clerkMiddleware());
+if (process.env.CLERK_SECRET_KEY) {
+  app.use(clerkMiddleware());
+} else {
+  app.use((req, _res, next) => {
+    (req as any).auth = undefined;
+    next();
+  });
+}
 
 app.use("/api", router);
 

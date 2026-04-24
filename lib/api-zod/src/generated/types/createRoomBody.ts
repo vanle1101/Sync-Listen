@@ -8,4 +8,5 @@
 
 export interface CreateRoomBody {
   hostName: string;
+  roomName: string;
 }
